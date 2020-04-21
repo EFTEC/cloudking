@@ -12,7 +12,8 @@
     ],
     "require": {
         "php": ">=5.6",
-        "ext-json": "*"
+        "ext-json": "*",
+        "ext-xml": "*"
     },
     "autoload": {
         "psr-4": {

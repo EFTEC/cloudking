@@ -224,6 +224,10 @@ $x=new Example2WSClient();
 var_dump($x->ping(20));
 ```
 
+## TODO
+
+There is some broken features but it works in basic examples.
+
 ## Versions
 
 * 2.4.1 A fix with the composer.json  
