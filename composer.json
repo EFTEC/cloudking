@@ -3,7 +3,7 @@
     "type": "library",
     "description": "A SOAP webserver for PHP",
     "license": "MIT",
-    "version": "2.4.1",
+    "version": "2.5",
     "authors": [
         {
             "name": "Jorge Castro",

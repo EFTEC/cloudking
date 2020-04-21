@@ -33,7 +33,7 @@ class Example2WSService {
 
             $all=$this->getDB();
             foreach($all as $item) {
-                if($item['idProducto']===$idProducto) {
+                if(@$item['idProducto']===$idProducto) {
                     $_Producto=$item;
                     break;
                 }

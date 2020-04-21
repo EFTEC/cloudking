@@ -1,8 +1,9 @@
-<? /** @noinspection DuplicatedCode */
+<? /** @noinspection PhpUnused */
+/** @noinspection DuplicatedCode */
 
 /* 
 CloudKing Client 
-Version 2.3.4
+Version 2.4
 Copyright Jorge Castro Castillo
 License http://www.southprojects.com/product/cloudking/license1-1/
 */
@@ -11,7 +12,7 @@ namespace eftec\cloudking;
 
 class CloudKingClient
 {
-    var $user_agent = "CloudKing Client (2.3.4)";
+    var $user_agent = "CloudKing Client (2.5)";
     var $charset = "UTF-8";
     var $soap = 1.2; // or 1.1
     var $tempuri = "http://tempuri.org";
@@ -82,10 +83,23 @@ class CloudKingClient
         $resultadoxml = substr($rawresponse, $p1 + 2);
 
         // ["Envelope"]["Body"]
+        
         $g = $this->xml2array(@$resultadoxml);
         return $g["Envelope"]["Body"][$nameFunction . "Response"];
     }
 
+
+    /**
+     * @param $tnsName
+     * @return mixed|string
+     */
+    private function separateNS($tnsName) {
+        if (strpos($tnsName, ':') === false) {
+            return $tnsName;
+        }
+        $r = explode(':', $tnsName, 2);
+        return $r[1];
+    }
     function array2xml($array, $name = "root", $contenttype = true, $start = true, $keyx = "") {
         if (!is_array($array)) {
             $array = array($name => $array);
@@ -132,114 +146,88 @@ class CloudKingClient
         }
         return "string";
     }
-
-    public function xml2array($contents, $get_attributes = 0, $priority = 'tag') {
-        if (!$contents) {
-            return array();
-        }
-        if (!function_exists('xml_parser_create')) {
-            return array();
-        }
+    
+    public function xml2array($xml) {
+        $parentKey=[];
+        $result=[];
         $parser = xml_parser_create('');
-        xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, $this->charset);
+        xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, 'utf-8');
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 1);
-        xml_parse_into_struct($parser, trim($contents), $xml_values);
+        @xml_parse_into_struct($parser, trim($xml), $xmls);
         xml_parser_free($parser);
-        if (!$xml_values) {
-            trigger_error('wrong xml value in xml2array',E_USER_ERROR);
-        }
-        $xml_array = array();
-        $current =& $xml_array;
-        $repeated_tag_index = array();
-        foreach ($xml_values as $data) {
-            unset($attributes, $value);
-            extract($data);
-            $result = array();
-            $attributes_data = array();
-            if (isset($value)) {
-                if ($priority == 'tag') {
-                    $result = $value;
-                } else {
-                    $result['value'] = $value;
-                }
-            }
-            if (isset($attributes) and $get_attributes) {
-                foreach ($attributes as $attr => $val) {
-                    if ($priority == 'tag') {
-                        $attributes_data[$attr] = $val;
+
+
+        foreach($xmls as $x) {
+            $type=@$x['type'];
+            $level=@$x['level'];
+            $value=@$x['value'];
+            $tag=@$x['tag'];
+            switch ($type) {
+                case 'open':
+                    $ns=$this->separateNS($tag);
+                    /*if(!isset($parentKey[$level])) {
+                        $parentKey[$level]=$ns;
                     } else {
-                        $result['attr'][$attr] = $val;
+                        $parentKey[$level]++;
                     }
-                }
-            }
-            $tag = $this->fixtag($tag);
-            if ($type == "open") {
-                $parent[$level - 1] =& $current;
-                if (!is_array($current) or (!in_array($tag, array_keys($current)))) {
-                    $current[$tag] = $result;
-                    if ($attributes_data) {
-                        $current[$tag . '_attr'] = $attributes_data;
-                    }
-                    $repeated_tag_index[$tag . '_' . $level] = 1;
-                    $current =& $current[$tag];
-                } else {
-                    if (isset($current[$tag][0])) {
-                        $current[$tag][$repeated_tag_index[$tag . '_' . $level]] = $result;
-                        $repeated_tag_index[$tag . '_' . $level]++;
-                    } else {
-                        $current[$tag] = array(
-                            $current[$tag],
-                            $result
-                        );
-                        $repeated_tag_index[$tag . '_' . $level] = 2;
-                        if (isset($current[$tag . '_attr'])) {
-                            $current[$tag]['0_attr'] = $current[$tag . '_attr'];
-                            unset($current[$tag . '_attr']);
-                        }
-                    }
-                    $last_item_index = $repeated_tag_index[$tag . '_' . $level] - 1;
-                    $current =& $current[$tag][$last_item_index];
-                }
-            } elseif ($type == "complete") {
-                if (!isset($current[$tag])) {
-                    $current[$tag] = $result;
-                    $repeated_tag_index[$tag . '_' . $level] = 1;
-                    if ($priority == 'tag' and $attributes_data) {
-                        $current[$tag . '_attr'] = $attributes_data;
-                    }
-                } else {
-                    if (isset($current[$tag][0]) and is_array($current[$tag])) { //If it is already an array...
-                        $current[$tag][$repeated_tag_index[$tag . '_' . $level]] = $result;
-                        if ($priority == 'tag' and $get_attributes and $attributes_data) {
-                            $current[$tag][$repeated_tag_index[$tag . '_' . $level] . '_attr'] = $attributes_data;
-                        }
-                        $repeated_tag_index[$tag . '_' . $level]++;
-                    } else {
-                        $tmp = $current[$tag];
-                        @$current[$tag] = array(
-                            $tmp,
-                            $result
-                        );
-                        $repeated_tag_index[$tag . '_' . $level] = 1;
-                        if ($priority == 'tag' and $get_attributes) {
-                            if (isset($current[$tag . '_attr'])) {
-                                $current[$tag]['0_attr'] = $current[$tag . '_attr'];
-                                unset($current[$tag . '_attr']);
-                            }
-                            if ($attributes_data) {
-                                $current[$tag][$repeated_tag_index[$tag . '_' . $level] . '_attr'] = $attributes_data;
-                            }
-                        }
-                        $repeated_tag_index[$tag . '_' . $level]++; //0 and 1 index is already taken
-                    }
-                }
-            } elseif ($type == 'close') {
-                $current =& $parent[$level - 1];
+                    */
+                    $parentKey[$level]=$ns;
+                    $this->addElementArray($result,$parentKey,$level,$ns,[]);
+                    break;
+                case 'close':
+                    //$parentKey[$level]++;
+                    break;
+                case 'complete':
+                    $this->addElementArray($result, $parentKey, $level, $tag, $value);
+                    break;
             }
         }
-        return ($xml_array);
+        return $result;
     }
+    private function addElementArray(&$array,$keys,$level,$tag,$value) {
+        switch ($level) {
+            case 1:
+                $array[$tag]=$value;
+                break;
+            case 2:
+                $array[$keys[1]][$tag]=$value;
+                break;
+            case 3:
+                $array[$keys[1]][$keys[2]][$tag]=$value;
+                break;
+            case 4:
+                $array[$keys[1]][$keys[2]][$keys[3]][$tag]=$value;
+                break;
+            case 5:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$tag]=$value;
+                break;
+            case 6:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$tag]=$value;
+                break;
+            case 7:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$tag]=$value;
+                break;
+            case 8:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$tag]=$value;
+                break;
+            case 9:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$tag]=$value;
+                break;
+            case 10:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$tag]=$value;
+                break;
+            case 11:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$tag]=$value;
+                break;
+        }
+    }
+
 
     public function fixtag($tag) {
         $arr = explode(":", $tag);

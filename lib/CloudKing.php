@@ -1,4 +1,7 @@
-<?php /** @noinspection DuplicatedCode */
+<?php /** @noinspection PhpUnusedPrivateMethodInspection */
+/** @noinspection JSUnresolvedFunction */
+/** @noinspection JSUndeclaredVariable */
+/** @noinspection DuplicatedCode */
 
 /** @noinspection PhpUnused */
 
@@ -12,7 +15,7 @@ namespace eftec\cloudking;
  */
 class CloudKing
 {
-    protected $version = "2.4.1";
+    protected $version = "2.5";
     public $allowed_format;
     var $soap11 = true;
     var $soap12 = false;
@@ -122,8 +125,10 @@ class CloudKing
         $this->custom_wsdl = $this->FILE . "?wsdl";
     }
 
-    public static function argList($name = 'return', $type = 'tns:*', $minOccurs = 0, $maxOccurs = 'unbounded') {
-        return ["name" => $name, "type" => $type, "minOccurs" => $minOccurs, "maxOccurs" => $maxOccurs];
+    public static function argList($name = 'return', $type = 'tns:*', $minOccurs = 0
+        , $maxOccurs = 'unbounded', $byref = false) {
+        return ["name" => $name, "type" => $type, "minOccurs" => $minOccurs
+            , "maxOccurs" => $maxOccurs, "byref" => $byref];
     }
 
     /**
@@ -133,11 +138,11 @@ class CloudKing
      * @return array
      */
     public static function argPrim($name = 'return', $type = 's:*', $byref = false) {
-        return ["name" => $name, "type" => $type, "byref" => false];
+        return ["name" => $name, "type" => $type, "byref" => $byref];
     }
 
     public static function argComplex($name = 'return', $type = 'tns:*', $byref = false) {
-        return ["name" => $name, "type" => $type, "byref" => false];
+        return ["name" => $name, "type" => $type, "byref" => $byref];
     }
 
     public function set_copyright($copyright) {
@@ -373,7 +378,7 @@ class CloudKing
         if ($soapenv == "") {
             die("soap incorrect or not allowed");
         }
-        $arr = $this->xml2array($HTTP_RAW_POST_DATA, 0);
+        $arr = $this->xml2array($HTTP_RAW_POST_DATA);
         $this->wsse_username = @$arr["Envelope"]["Header"]["Security"]["UsernameToken"]["Username"];
         $this->wsse_password = @$arr["Envelope"]["Header"]["Security"]["UsernameToken"]["Password"];
         $this->wsse_nonce = @$arr["Envelope"]["Header"]["Security"]["UsernameToken"]["Nonce"];
@@ -495,7 +500,6 @@ class CloudKing
         // agregamos si tiene valor byref.
         $extrabyref = "";
         $indice = 0;
-        $key = $indice_operation;
         $value = $this->operation[$indice_operation];
 
         foreach ($value["in"] as $key2 => $value2) {
@@ -536,131 +540,85 @@ class CloudKing
 
         return $resultado;
     }
-
-    private function xml2array($contents, $get_attributes = 0, $priority = 'tag') {
-        if (!$contents) {
-            return array();
-        }
-        if (!function_exists('xml_parser_create')) {
-            //print "'xml_parser_create()' function not found!";
-            return array();
-        }
-        //Get the XML parser of PHP - PHP must have this module for the parser to work
+    public function xml2array($xml) {
+        $parentKey=[];
+        $result=[];
         $parser = xml_parser_create('');
-        xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING,
-                              $this->encoding); # http://minutillo.com/steve/weblog/2004/6/17/php-xml-and-character-encodings-a-tale-of-sadness-rage-and-data-loss
+        xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, 'utf-8');
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 1);
-        xml_parse_into_struct($parser, trim($contents), $xml_values);
+        @xml_parse_into_struct($parser, trim($xml), $xmls);
         xml_parser_free($parser);
-        if (!$xml_values) {
-            return null;
-        } //Hmm...
-        //Initializations
-        $xml_array = array();
-        $parents = array();
-        $opened_tags = array();
-        $arr = array();
-        $current =& $xml_array; //Refference
-        //Go through the tags.
-        $repeated_tag_index = array();    //Multiple tags with same name will be turned into an array
-        foreach ($xml_values as $data) {
-            unset($attributes, $value); //Remove existing values, or there will be trouble
-            //This command will extract these variables into the foreach scope
-            // tag(string), type(string), level(int), attributes(array).
-            extract($data); //We could use the array by itself, but this cooler.
-            $result = array();
-            $attributes_data = array();
-            if (isset($value)) {
-                if ($priority == 'tag') {
-                    $result = $value;
-                } else {
-                    $result['value'] = $value;
-                } //Put the value in a assoc array if we are in the 'Attribute' mode
-            }
-            //Set the attributes too.
-            if (isset($attributes) and $get_attributes) {
-                foreach ($attributes as $attr => $val) {
-                    if ($priority == 'tag') {
-                        $attributes_data[$attr] = $val;
+
+
+        foreach($xmls as $x) {
+            $type=@$x['type'];
+            $level=@$x['level'];
+            $value=@$x['value'];
+            $tag=@$x['tag'];
+            switch ($type) {
+                case 'open':
+                    $ns=$this->separateNS($tag);
+                    /*if(!isset($parentKey[$level])) {
+                        $parentKey[$level]=$ns;
                     } else {
-                        $result['attr'][$attr] = $val;
-                    } //Set all the attributes in a array called 'attr'
-                }
-            }
-            //See tag status and do the needed.
-            $tag = $this->fixtag($tag);
-            if ($type == "open") {    //The starting of the tag '<tag>'
-                $parent[$level - 1] =& $current;
-                if (!is_array($current) or (!in_array($tag, array_keys($current)))) { //Insert New tag
-                    $current[$tag] = $result;
-                    if ($attributes_data) {
-                        $current[$tag . '_attr'] = $attributes_data;
+                        $parentKey[$level]++;
                     }
-                    $repeated_tag_index[$tag . '_' . $level] = 1;
-                    $current =& $current[$tag];
-                } else {                            //There was another element with the same tag name
-                    if (isset($current[$tag][0])) { //If there is a 0th element it is already an array
-                        $current[$tag][$repeated_tag_index[$tag . '_' . $level]] = $result;
-                        $repeated_tag_index[$tag . '_' . $level]++;
-                    } else { //This section will make the value an array if multiple tags with the same name appear together
-                        $current[$tag] = array(
-                            $current[$tag],
-                            $result
-                        ); //This will combine the existing item and the new item together to make an array
-                        $repeated_tag_index[$tag . '_' . $level] = 2;
-                        if (isset($current[$tag .
-                            '_attr'])) { //The attribute of the last(0th) tag must be moved as well
-                            $current[$tag]['0_attr'] = $current[$tag . '_attr'];
-                            unset($current[$tag . '_attr']);
-                        }
-                    }
-                    $last_item_index = $repeated_tag_index[$tag . '_' . $level] - 1;
-                    $current =& $current[$tag][$last_item_index];
-                }
-            } elseif ($type == "complete") { //Tags that ends in 1 line '<tag />'
-                //See if the key is already taken.
-                if (!isset($current[$tag])) { //New Key
-                    $current[$tag] = $result;
-                    $repeated_tag_index[$tag . '_' . $level] = 1;
-                    if ($priority == 'tag' and $attributes_data) {
-                        $current[$tag . '_attr'] = $attributes_data;
-                    }
-                } else { //If taken, put all things inside a list(array)
-                    if (isset($current[$tag][0]) and is_array($current[$tag])) { //If it is already an array...
-                        // ...push the new element into that array.
-                        $current[$tag][$repeated_tag_index[$tag . '_' . $level]] = $result;
-                        if ($priority == 'tag' and $get_attributes and $attributes_data) {
-                            $current[$tag][$repeated_tag_index[$tag . '_' . $level] . '_attr'] = $attributes_data;
-                        }
-                        $repeated_tag_index[$tag . '_' . $level]++;
-                    } else { //If it is not an array...
-                        $tmp = $current[$tag];
-                        //echo "tag = $tag result = $result current=$tmp<br>";
-                        //var_dump($current);
-                        @$current[$tag] = array(
-                            $tmp,
-                            $result
-                        ); //...Make it an array using using the existing value and the new value
-                        $repeated_tag_index[$tag . '_' . $level] = 1;
-                        if ($priority == 'tag' and $get_attributes) {
-                            if (isset($current[$tag .
-                                '_attr'])) { //The attribute of the last(0th) tag must be moved as well
-                                $current[$tag]['0_attr'] = $current[$tag . '_attr'];
-                                unset($current[$tag . '_attr']);
-                            }
-                            if ($attributes_data) {
-                                $current[$tag][$repeated_tag_index[$tag . '_' . $level] . '_attr'] = $attributes_data;
-                            }
-                        }
-                        $repeated_tag_index[$tag . '_' . $level]++; //0 and 1 index is already taken
-                    }
-                }
-            } elseif ($type == 'close') { //End of tag '</tag>'
-                $current =& $parent[$level - 1];
+                    */
+                    $parentKey[$level]=$ns;
+                    $this->addElementArray($result,$parentKey,$level,$ns,[]);
+                    break;
+                case 'close':
+                    //$parentKey[$level]++;
+                    break;
+                case 'complete':
+                    $this->addElementArray($result, $parentKey, $level, $tag, $value);
+                    break;
             }
         }
-        return ($xml_array);
+        return $result;
+    }
+    private function addElementArray(&$array,$keys,$level,$tag,$value) {
+        switch ($level) {
+            case 1:
+                $array[$tag]=$value;
+                break;
+            case 2:
+                $array[$keys[1]][$tag]=$value;
+                break;
+            case 3:
+                $array[$keys[1]][$keys[2]][$tag]=$value;
+                break;
+            case 4:
+                $array[$keys[1]][$keys[2]][$keys[3]][$tag]=$value;
+                break;
+            case 5:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$tag]=$value;
+                break;
+            case 6:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$tag]=$value;
+                break;
+            case 7:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$tag]=$value;
+                break;
+            case 8:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$tag]=$value;
+                break;
+            case 9:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$tag]=$value;
+                break;
+            case 10:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$tag]=$value;
+                break;
+            case 11:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$tag]=$value;
+                break;
+        }
     }
 
     private function array2class($arr, $newclass) {
@@ -681,9 +639,10 @@ class CloudKing
         if ($idx == -1) {
             trigger_error('Complex Type ' . $newclass . ' not found', E_USER_ERROR);
         }
-        foreach ($this->complextype[$idx]["elements"] as &$value) {
+        foreach ($this->complextype[$idx]["elements"] as $value) {
             if (strpos($value["type"], "tns:", 0) !== false) {
-                $result->$value["name"] = $this->array2class($result->$value["name"], $this->fixtag($value["type"]));
+                $result->$value["name"] = $this->array2class($result->$value["name"]
+                    , $this->fixtag($value["type"]));
             }
         }
 
@@ -695,7 +654,7 @@ class CloudKing
             $resultado = (array)$class;
 
             $idx = $this->findIdxComplexType($classname);
-            foreach ($this->complextype[$idx]["elements"] as &$value) {
+            foreach ($this->complextype[$idx]["elements"] as $value) {
                 if (strpos($value["type"], "tns:", 0) !== false) {
                     $this->class2array($resultado[$value["name"]], $this->fixtag($value["type"]));
                     //$tmp=$this->class2array($resultado[$value["name"]], $this->fixtag($value["type"]));
@@ -728,6 +687,7 @@ class CloudKing
 
     /**
      * @param $tnsName
+     * @return mixed|string
      */
     private function separateNS($tnsName) {
         if (strpos($tnsName, ':') === false) {
@@ -856,8 +816,6 @@ class CloudKing
                     $classname = $operation["in"][$key]["type"];
                     if (strpos($classname, "tns:", 0) !== false) {
                         $param[$key] = $this->array2class($value, $this->fixtag($classname));
-                    } else {
-                        // not touched.
                     }
                 }
             }
@@ -928,7 +886,7 @@ class CloudKing
                 $tmp = json_decode($tmpvalue);
                 break;
             case "xml":
-                $this->xml2array($tmpvalue, 1);
+                $this->xml2array($tmpvalue);
                 break;
             case "php":
                 $tmp = @unserialize($tmpvalue);
@@ -1524,7 +1482,7 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
 
         $r .= "\n" . $this->genphpast("Complex Types (Classes)");
         foreach ($this->complextype as $key => $value) {
-            $type = $this->fixtag($value2["type"]);
+            $type = $this->fixtag($value["type"]);
 
 
             if (strlen($value["name"]) <= 7 || substr($value["name"], 0, 7) == "ArrayOf") {
@@ -1758,13 +1716,13 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     protected function var_is_defined($fullname) {
         $x1 = explode(":", $fullname);
         if (count($x1) != 2) {
-            return "<font color='red'>$fullname</font>";
+            return "<span style='color:red'>$fullname</span>";
         }
         $space = $x1[0];
         $name = $x1[1];
         if ($space == "s") {
             if (!in_array($name, $this->predef_types)) {
-                return "<font color='red'>$fullname</font>";
+                return "<span style='color:red'>$fullname</span>";
             }
             return "<a href='http://www.w3.org/TR/xmlschema-2/#$name'>$fullname</a>";
         }
@@ -1774,9 +1732,9 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
                     return "<a href='#$name'>$fullname</a>";
                 }
             }
-            return "<font color='red'>$fullname</font>";
+            return "<span style='color:red'>$fullname</span>";
         }
-        return "<font color='red'>??$fullname</font>";
+        return "<span style='color:red'>??$fullname</span>";
     }
 
     public function addfunction($namefunction, $arr_in, $arr_out, $description = "") {
