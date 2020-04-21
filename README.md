@@ -13,3 +13,7 @@ It supports SOAP 1.1, 1.2 or both.  JAVA usually supports 1.1, C# supports both.
 [![CocoaPods](https://img.shields.io/badge/docs-70%25-yellow.svg)]()
 
 
+# Versions
+
+* 2.4.1 A fix with the composer.json  
+* 2.4 A new version   

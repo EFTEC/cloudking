@@ -2,8 +2,8 @@
     "name": "eftec/cloudking",
     "type": "library",
     "description": "A SOAP webserver for PHP",
-    "license": "LGPL",
-    "version": "2.4",
+    "license": "MIT",
+    "version": "2.4.1",
     "authors": [
         {
             "name": "Jorge Castro",

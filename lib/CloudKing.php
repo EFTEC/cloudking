@@ -12,7 +12,7 @@ namespace eftec\cloudking;
  */
 class CloudKing
 {
-    protected $version = "2.4";
+    protected $version = "2.4.1";
     public $allowed_format;
     var $soap11 = true;
     var $soap12 = false;
