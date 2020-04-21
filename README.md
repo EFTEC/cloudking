@@ -232,6 +232,7 @@ var_dump($x->ping(20));
 There is some broken features but it works in basic examples.
 
 ## Versions
-
+* 2.5   
+    * xml serialization changed   
 * 2.4.1 A fix with the composer.json  
 * 2.4 A new version   
