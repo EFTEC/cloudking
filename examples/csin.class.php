@@ -312,7 +312,7 @@ class CSin {
 					$cuenta_zonas++;
 				}
 				if($cuenta_zonas>1){
-					$desc_zonas=substr(substr($desc_zonas,0,strlen($desc_zonas)-1),0,25).'...(más)';
+					$desc_zonas=substr(substr($desc_zonas,0,strlen($desc_zonas)-1),0,25).'...(mï¿½s)';
 				}else {
 					$desc_zonas=substr($desc_zonas,0,strlen($desc_zonas)-1);
 				}
@@ -332,7 +332,7 @@ class CSin {
 					$cuenta_ciudades++;
 				}
 				if ($cuenta_ciudades>1){
-					$desc_ciudades=substr(substr($desc_ciudades,0,strlen($desc_ciudades)-1),0,25).'...(más)';
+					$desc_ciudades=substr(substr($desc_ciudades,0,strlen($desc_ciudades)-1),0,25).'...(mï¿½s)';
 				}else{
 					$desc_ciudades=substr($desc_ciudades,0,strlen($desc_ciudades)-1);
 				}
@@ -352,7 +352,7 @@ class CSin {
 					$cuenta_localidades++;
 				}
 				if($cuenta_localidades>1){
-					$desc_localidades=substr(substr($desc_localidades,0,strlen($desc_localidades)-1),0,25).'...(más)';
+					$desc_localidades=substr(substr($desc_localidades,0,strlen($desc_localidades)-1),0,25).'...(mï¿½s)';
 				}else{
 					$desc_localidades=substr($desc_localidades,0,strlen($desc_localidades)-1);
 				}

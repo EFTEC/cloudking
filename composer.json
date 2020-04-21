@@ -1,0 +1,22 @@
+{
+    "name": "eftec/cloudking",
+    "type": "library",
+    "description": "A SOAP webserver for PHP",
+    "license": "LGPL",
+    "version": "2.4",
+    "authors": [
+        {
+            "name": "Jorge Castro",
+            "email": "jorge.castro.c@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.6",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "eftec\\cloudking\\": "lib/"
+        }
+    }
+}

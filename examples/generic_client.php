@@ -1,19 +1,21 @@
 <?
-include_once "./wslib/ckclient.2.3.php";
 
+use eftec\cloudking\CloudKingClient;
+
+include "../vendor/autoload.php";
 
 
 
 
 /***************************************** Implementation *****************************************/
-class Sin_WSClient {
-	var $url='http://localhost/currentproject/cloudking/webservice_example.php';
-	var $tempuri='http://localhost/currentproject/cloudking/webservice_example.php/';
+class ExampleCLient {
+	var $url='http://desannoc.vtr.cl/jcastro/sinws/webservice1.php';
+	var $tempuri='http://desannoc.vtr.cl/jcastro/sinws/webservice1.php/';
 
 	// Descripcion :Prueba de conexion 
 	// ping_param =  
 	function ping($ping_param) {
-		$_obj=new CKClient();
+		$_obj=new CloudKingClient();
 		$_obj->tempuri=$this->tempuri;
 		$_param='';
 		$_param.=$_obj->array2xml($ping_param,'ts:ping_param',false,false);
@@ -262,7 +264,7 @@ class Sin_WSClient {
 	}
 } // end Sin_WS
 
-$obj=new Sin_WSClient();
+$obj=new ExampleCLient();
 
 
 echo "llamando al webservice, funcion ping con parametro string <br>";

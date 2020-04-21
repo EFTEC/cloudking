@@ -1,6 +1,6 @@
 # cloudking
-A SOAP Server Engine for PHP 5.2 and higher.
+A SOAP Server Engine for PHP 5.6 and higher.
 
-For php 7.0 and higher its not working, so its in ALPHA.
+It supports SOAP 1.1, 1.2 or both.  JAVA usually supports 1.1, C# supports both.
 
---It doesn't work--
+
