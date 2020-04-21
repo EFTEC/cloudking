@@ -44,14 +44,10 @@ $ns->addfunction("GetProducto",
                  ],
                  "Descripcion :obtiene los datos de una objeto"
 	);
-$ns->addfunction("InsertProducto",
-                 array(
-                     CloudKing::argComplex('Producto', 'tns:Producto')
-                 ),
-                 array(
-                     CloudKing::argPrim('return', 's:boolean')
-                 ),
-                 "Descripcion :obtiene los datos de una objeto"
+$ns->addfunction("InsertProducto"
+    , array(CloudKing::argComplex('Producto', 'tns:Producto'))
+    ,array(CloudKing::argPrim('return', 's:boolean'))
+    , "Descripcion :obtiene los datos de una objeto"
 );
 $ns->addfunction("GetProductos",
                  [
