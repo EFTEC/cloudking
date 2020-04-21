@@ -14,14 +14,17 @@ It supports SOAP 1.1, 1.2 or both.  JAVA usually supports 1.1, C# supports both.
 
 Example of the UI
 
-
-
-
 ![](docs/screenshot1.jpg)
 
 ## Why we need Web Service SOAP?
 
 Because some legacy projects are still using it.   SOAP it is also declarative (instead of REST that lacks of a specification)
+
+And why to use this library?
+
+* It generates the server (service class and the client)  
+* It generates the WSDL.  
+* It works with complex structures.  
 
 ## Getting started
 
