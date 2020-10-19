@@ -3,7 +3,7 @@
     "type": "library",
     "description": "A SOAP webserver for PHP",
     "license": "MIT",
-    "version": "2.5",
+    "version": "2.6",
     "authors": [
         {
             "name": "Jorge Castro",
@@ -13,7 +13,8 @@
     "require": {
         "php": ">=5.6",
         "ext-json": "*",
-        "ext-xml": "*"
+        "ext-xml": "*",
+        "ext-curl": "*"
     },
     "autoload": {
         "psr-4": {
