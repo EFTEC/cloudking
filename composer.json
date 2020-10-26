@@ -3,7 +3,7 @@
     "type": "library",
     "description": "A SOAP webserver for PHP",
     "license": "MIT",
-    "version": "2.6",
+    "version": "3.0",
     "authors": [
         {
             "name": "Jorge Castro",
@@ -16,9 +16,17 @@
         "ext-xml": "*",
         "ext-curl": "*"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^5.7"
+    },
     "autoload": {
         "psr-4": {
             "eftec\\cloudking\\": "lib/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "eftec\\tests\\": "tests/"
         }
     }
 }

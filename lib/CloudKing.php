@@ -1,4 +1,5 @@
-<?php /** @noinspection PhpUnused */
+<?php /** @noinspection ForgottenDebugOutputInspection */
+/** @noinspection PhpUnused */
 /** @noinspection UnknownInspectionInspection */
 /** @noinspection TypeUnsafeArraySearchInspection */
 /** @noinspection TypeUnsafeComparisonInspection */
@@ -7,32 +8,43 @@
 /** @noinspection JSUndeclaredVariable */
 /** @noinspection DuplicatedCode */
 
-
-
 namespace eftec\cloudking;
+
+use RuntimeException;
 
 /**
  * Class CloudKing
- * @copyright Jorge Castro Castillo
- * @see https://github.com/eftec/cloudking
- * @package eftec\cloudking
+ *
+ * @copyright Jorge Castro Castillo Copyright (c)2009 - 2020, SouthProject <
+ * @see       https://github.com/eftec/cloudking
+ * @see       https://www.southprojects.com
+ *
+ * @package   eftec\cloudking
  */
-class CloudKing
-{
-    protected $version = '2.6';
-    public $allowed_format;
+class CloudKing {
+    protected $version = '3.0';
+
     public $soap11 = true;
     public $soap12 = false;
     public $get = true;
     public $post = true;
-    public $allowed_input = ['json' => true, 'rest' => true
-        , 'php' => true, 'xml' => true, 'none' => true,'gui'=>true
-        ,'phpclient'=>true,'unity'=>true];
+    public $allowed_input
+        = [
+            'json' => true,
+            'rest' => true,
+            'php' => true,
+            'xml' => true,
+            'none' => true,
+            'gui' => true,
+            'phpclient' => true,
+            'unity' => true
+        ];
     /**
      * If the service is not set, then it will be unable to answer any call.
+     *
      * @var null|object
      */
-    public $serviceInstance;    
+    public $serviceInstance;
     public $oem = false;
     public $encoding = 'UTF-8';
     public $custom_wsdl = '';
@@ -44,140 +56,293 @@ class CloudKing
     public $wsse_nonce = '';
     public $wsse_created = ''; // ISO-8859-1
     public $wsse_password_type = 'None';
-    public $variable_type = 'array'; //Copyright (c)2009 - 2020, SouthProject <a href='http://www.southprojects.com'>www.southprojects.com</a>";
+    public $variable_type = 'array';
     public $allowed = array('*');
     public $disallowed = array('');
-    protected $FILE;
-    protected $NAMESPACE;
-    protected $NAME_WS;
+    public $folderServer = '';
+    public $lastError = '';
+    /** @var string port URL */
+    protected $portUrl;
+    /** @var string the namespace of the web service (with trailing dash) and the classes.<br>
+     * Example: https://www.southprojects.com/
+     */
+    protected $nameSpace;
+    /** @var string The name of the web service, such as "myservice" */
+    protected $nameWebService;
     /** @var array ['','None','PasswordDigest','PasswordText'][$i] */
     protected $operation; //None, PasswordDigest, PasswordText
     ///** @var string=['array','object'][$i] it define if the implementation will use array (or primitives) or objects */ 
     protected $complextype;
-    
-    protected $predef_types = [
-        'string',
-        'long',
-        'int',
-        'integer',
-        'boolean',
-        'decimal',
-        'float',
-        'double',
-        'duration',
-        'dateTime',
-        'time',
-        'date',
-        'gYearMonth',
-        'gYear',
-        'gMonthDay',
-        'gDay',
-        'gMonth',
-        'hexBinary',
-        'base64Binary',
-        'anyURI',
-        'QName',
-        'NOTATION'
-    ];
-    protected $predef_typesNS = [
-        'string',
-        'long',
-        'int',
-        'integer',
-        'boolean',
-        'decimal',
-        'float',
-        'double',
-        'duration',
-        'dateTime',
-        'time',
-        'date',
-        'gYearMonth',
-        'gYear',
-        'gMonthDay',
-        'gDay',
-        'gMonth',
-        'hexBinary',
-        'base64Binary',
-        'anyURI',
-        'QName',
-        'NOTATION'
-    ];
-    protected $predef_types_num = array(
-        'long',
-        'int',
-        'integer',
-        'boolean',
-        'decimal',
-        'float',
-        'double',
-        'duration'
-    );
 
-    public function __construct($FILE, $NAMESPACE = 'http://test-uri/', $NAME_WS = 'CKService1') {
-        $this->_CKLIB($FILE, $NAMESPACE, $NAME_WS);
-    }
+    protected $predef_types
+        = [
+            'string',
+            'long',
+            'int',
+            //'integer',
+            'boolean',
+            'decimal',
+            'float',
+            'double',
+            'duration',
+            'dateTime',
+            'time',
+            'date',
+            'gYearMonth',
+            'gYear',
+            'gMonthDay',
+            'gDay',
+            'gMonth',
+            'hexBinary',
+            'base64Binary',
+            'anyURI',
+            'QName',
+            'NOTATION'
+        ];
+    protected $predef_typesNS
+        = [
+            'string',
+            'long',
+            'int',
+            //'integer',
+            'boolean',
+            'decimal',
+            'float',
+            'double',
+            'duration',
+            'dateTime',
+            'time',
+            'date',
+            'gYearMonth',
+            'gYear',
+            'gMonthDay',
+            'gDay',
+            'gMonth',
+            'hexBinary',
+            'base64Binary',
+            'anyURI',
+            'QName',
+            'NOTATION'
+        ];
+    protected $predef_types_num
+        = array(
+            'long',
+            'int',
+            'integer',
+            'boolean',
+            'decimal',
+            'float',
+            'double',
+            'duration'
+        );
 
-    private function _CKLIB($FILE, $NAMESPACE, $NAME_WS) {
-
-        if (@$_SERVER['HTTPS']) {
-            $FILE = str_replace('http://', 'https://', $FILE);
+    /**
+     * CloudKing constructor.
+     *
+     * @param string $portUrl   The port url where we will do the connection.
+     * @param string $nameSpace with trailing slash
+     * @param string $nameWebService
+     */
+    public function __construct($portUrl='', $nameSpace = 'http://test-uri/', $nameWebService = 'CKService1') {
+        if($portUrl==='') {
+            if(!isset($_SERVER['SERVER_NAME'])) {
+                $portUrl = $_SERVER['SCRIPT_NAME'];
+            } else {
+                $portUrl = 'http://' . $_SERVER['SERVER_NAME'] . $_SERVER['SCRIPT_NAME'];
+            }
+            
         }
-        $this->FILE = $FILE;
+        
+        if (@$_SERVER['HTTPS']) {
+            $portUrl = str_replace('http://', 'https://', $portUrl);
+        }
+        $this->portUrl = $portUrl;
 
-
-        $this->NAMESPACE = ($NAMESPACE != '') ? $NAMESPACE : $FILE . '/';
-        $this->NAME_WS = ($NAME_WS != '') ? $NAME_WS : 'CKService1';
+        $this->nameSpace = ($nameSpace != '') ? $nameSpace : $portUrl . '/';
+        $this->nameWebService = ($nameWebService != '') ? $nameWebService : 'CKService1';
         $this->operation = array();
         $this->complextype = array();
-        $this->custom_wsdl = $this->FILE . '?wsdl';
+        $this->custom_wsdl = $this->portUrl . '?wsdl';
     }
 
     /**
      * We add an argument that returns a list of complex.
-     * 
-     * @param string $name Name of the argument
-     * @param string $type Type of the complex argument tns:NameComplex or NameComplex
-     * @param int    $minOccurs
-     * @param string $maxOccurs
-     * @param false  $byref
+     *
+     * @param string $name        Name of the argument
+     * @param string $type        Type of the complex argument tns:NameComplex or NameComplex
+     * @param int    $minOccurs   Minimum ocurrence,if 0 it means that the value is not required.
+     * @param string $maxOccurs   Maximum ocurrences. If "unbounded" means unlimited.
+     * @param false  $byref       If the value will be returned.
+     * @param string $description (optional) the description of the web service.
      *
      * @return array
      */
-    public static function argList($name = 'return', $type = 'tns:*', $minOccurs = 0
-        , $maxOccurs = 'unbounded', $byref = false) {
-        $type=strpos($type,':')===false ? 'tns:'.$type : $type;
-        return ['name' => $name, 'type' => $type, 'minOccurs' => $minOccurs
-            , 'maxOccurs' => $maxOccurs, 'byref' => $byref];
+    public static function argList(
+        $name = 'return',
+        $type = 'tns:*',
+        $minOccurs = 0
+        ,
+        $maxOccurs = 'unbounded',
+        $byref = false,
+        $description = ''
+    ) {
+        $type = strpos($type, ':') === false ? 'tns:' . $type : $type;
+        return [
+            'name' => $name,
+            'type' => $type,
+            'minOccurs' => $minOccurs
+            ,
+            'maxOccurs' => $maxOccurs,
+            'byref' => $byref,
+            'description' => $description
+        ];
+    }
+
+    /**
+     * @param string $nameParam the name of the parameter. If it is return, then uses 'return'
+     * @param string $type      =$this->predef_typesNS[$i]
+     * @param false  $byref
+     * @param false  $required
+     * @param string $description
+     *
+     * @return array
+     */
+    public function paramList(
+        $nameParam = 'return',
+        $type = '',
+        $byref = false,
+        $required = false
+        ,
+        $description = ''
+    ) {
+
+        if (in_array($type, $this->predef_typesNS)) {
+            $primitive = true;
+            $prefix = 's:';
+        } else {
+            $found = $this->findComplexByName($type);
+            if ($found === false) {
+                throw new RuntimeException("paramList: Type [$type] not defined");
+            }
+            $primitive = false;
+            $prefix = 'tns:';
+        }
+        if (!$primitive) {
+            $newType = 'ArrayOf' . $type;
+            $found = $this->findComplexByName($newType);
+            if (!$found) {
+                // we add a new complex type
+                $this->addtype($newType, array(
+                    self::argList($type, $prefix . $type, '0', 'unbounded')
+                ));
+            }
+        } else {
+            $newType = 'ArrayOf' . $type;
+        }
+        return self::argList($nameParam, $newType, ($required ? 1 : 0), 1, $byref, $description);
+    }
+
+    /**
+     * @param string $nameParam
+     * @param string $type =$this->predef_typesNS[$i]
+     * @param false  $byref
+     * @param false  $required
+     * @param string $description
+     *
+     * @return array
+     */
+    public function param($nameParam, $type, $byref = false, $required = false, $description = '') {
+        if (in_array($type, $this->predef_typesNS)) {
+            $prefix = 's:';
+        } else {
+            $found = $this->findComplexByName($type);
+            if ($found === false) {
+                throw new RuntimeException("paramList: Type [$type] not defined");
+            }
+            $prefix = 'tns:';
+        }
+        return self::argPrim($nameParam, $prefix . $type, $byref, $required, $description);
+    }
+
+    /**
+     * It finds a complex type. If not found then it returns false.
+     *
+     * @param string $nameType without namespace
+     *
+     * @return false|mixed
+     */
+    private function findComplexByName($nameType) {
+        if (isset($this->complextype[$nameType])) {
+            return $this->complextype[$nameType];
+        }
+        return false;
+    }
+
+    private function findOperationByName($nameOp) {
+        if (isset($this->operation[$nameOp])) {
+            return $this->operation[$nameOp];
+        }
+        return false;
     }
 
     /**
      * We add a primary argument
-     * 
-     * @param string $name Name of the argument
-     * @param string $type=$this->predef_typesNS[$i] It could be "s:int" or "int"
-     * @param bool $byref if true then it returns the value
+     *
+     * @param string $name        Name of the argument
+     * @param string $type        =$this->predef_typesNS[$i] It could be "s:int" or "int"
+     * @param bool   $byref       if true then it returns the value
+     * @param bool   $required    if true then the value is required
+     * @param string $description (optional) the description
+     *
      * @return array
-     * @see \eftec\cloudking\CloudKing::$predef_typesNS             
-     *              
+     * @see \eftec\cloudking\CloudKing::$predef_typesNS
      */
-    public static function argPrim($name = 'return', $type = 's:*', $byref = false) {
-        $type=strpos($type,':')===false ? 's:'.$type : $type;
-        return ['name' => $name, 'type' => $type, 'byref' => $byref];
+    public static function argPrim(
+        $name = 'return',
+        $type = 's:*',
+        $byref = false,
+        $required = false,
+        $description = ''
+    ) {
+        $type = strpos($type, ':') === false ? 's:' . $type : $type;
+        return [
+            'name' => $name,
+            'type' => $type,
+            'byref' => $byref
+            ,
+            'minOccurs' => ($required) ? '1' : '0',
+            'description' => $description
+        ];
     }
 
     /**
      * We add a complex argument (Comple arguments are added with the method addType)
-     * 
-     * @param string $name Name of the argument
-     * @param string $type Type of the complex argument (SOAP specification)
+     *
+     * @param string $name  Name of the argument
+     * @param string $type  Type of the complex argument (SOAP specification)
      * @param false  $byref if true then it returns the value
+     * @param bool   $required
+     * @param string $description
      *
      * @return array
      */
-    public static function argComplex($name = 'return', $type = 'tns:*', $byref = false) {
-        $type=strpos($type,':')===false ? 'tns:'.$type : $type;
-        return ['name' => $name, 'type' => $type, 'byref' => $byref];
+    public static function argComplex(
+        $name = 'return',
+        $type = 'tns:*',
+        $byref = false
+        ,
+        $required = false,
+        $description = ''
+    ) {
+        $type = strpos($type, ':') === false ? 'tns:' . $type : $type;
+        return [
+            'name' => $name,
+            'type' => $type,
+            'byref' => $byref
+            ,
+            'minOccurs' => ($required) ? '1' : '0',
+            'description' => $description
+        ];
     }
 
     public function set_copyright($copyright) {
@@ -204,7 +369,7 @@ class CloudKing
         }
         return true;
     }
-    
+
     public function run() {
         $result = '';
         if (!$this->security()) {
@@ -212,122 +377,137 @@ class CloudKing
         }
         global $_REQUEST;
         $param = @$_SERVER['QUERY_STRING'] . '&=';
+
         $p = strpos($param, '&');
         $p1 = strpos($param, '=');
         $paraminit = substr($param, 0, min($p, $p1)); // ?{value}&other=aaa
 
-
         //$HTTP_RAW_POST_DATA=@$GLOBALS['HTTP_RAW_POST_DATA'];
         $HTTP_RAW_POST_DATA = file_get_contents('php://input');
 
+        $isget = isset($_SERVER['REQUEST_METHOD']) 
+            ? $_SERVER['REQUEST_METHOD'] === 'GET' 
+            : true;
+        
 
-        $isget = false;
-        $methodcalled = ($paraminit == '') ? 'soap' : $paraminit;
+        //$info = explode('/', @$_SERVER['PATH_INFO']);
+        //$functionName = (count($info) >= 2) ? $info[1] : '';
+        //$functionTypeOut = (count($info) >= 3) ? $info[2] : $methodcalled;
+
+        $functionName = isset($_GET['_op']) ? $_GET['_op'] : '';
+        $functionTypeOut = isset($_GET['_out']) ? $_GET['_out'] : $paraminit;
+
         $methoddefined = false;
-        if ($this->get && strlen($methodcalled) >= 3 && strpos($methodcalled, 'get') === 0) {
-            $methodcalled = str_replace('get', '', $methodcalled);
-            $methodcalled = ($methodcalled == '' ? 'none' : $methodcalled);
-            $isget = true;
-            $methoddefined = true;
-        }
-        if ($this->post && strlen($methodcalled) >= 4 && strpos($methodcalled, 'post') === 0) {
-            $methodcalled = str_replace('post', '', $methodcalled);
-            $methodcalled = ($methodcalled == '' ? 'none' : $methodcalled);
-            $isget = false;
-            $methoddefined = true;
-        }
-
-        $info = explode('/', @$_SERVER['PATH_INFO']);
-        $function_name = (count($info) >= 2) ? $info[1] : 'unknown_unknown';
-        $function_out = (count($info) >= 3) ? $info[2] : $methodcalled;
-
-        if ($this->get && count($info) >= 4) {
-            // is passing more that the functionname && output type 0> is rest myphp?php/functionname/typeout/p1/p2....
-            $isget = true;
-            $methodcalled = 'rest';
-            $methoddefined = true;
-        }
-        if ($this->soap12) {
-            if (!$methoddefined && !$HTTP_RAW_POST_DATA && $function_name !== 'unknown_unknown' && $this->get) {
+        if ($this->soap12 || $this->soap11) {
+            /*if (!$paraminit && $functionName !== '' && $isget) {
                 // mypage.php/functioname?param1=......
-                $methodcalled = 'none';
-                $function_out = 'xml';
+                $paraminit = 'soap';
+                //$functionTypeOut = 'xml';
                 $isget = true;
                 $methoddefined = true;
+            }*/
+            // url.php? (POST)
+            if ($paraminit === '' && $functionName === '' && !$isget) {
+                $paraminit = 'soap';
             }
-            if (!$methoddefined && $function_name !== 'unknown_unknown' && $this->post) {
+            /*if (!$paraminit && $functionName !== '' && $this->post) {
                 // mypage.php/functioname (it must be soap http post).
-
-                $methodcalled = 'none';
-                $function_out = 'xml';
+                $paraminit = 'soap';
+                $functionTypeOut = 'xml';
                 $HTTP_RAW_POST_DATA = ' '; // only for evaluation.
                 $isget = false;
                 $methoddefined = true;
-            }
+            }*/
         }
-        if (!@$this->allowed_input[$methodcalled] && $methoddefined) {
+        if (!@$this->allowed_input[$paraminit] && $methoddefined) {
 
-            trigger_error("method <b>$methodcalled</b> not allowed. Did you use SOAP 1.1 or 1.2?", E_USER_ERROR);
+            trigger_error("method <b>$paraminit</b> not allowed. Did you use SOAP 1.1 or 1.2?", E_USER_ERROR);
         }
 
-
-        if ($isget || $HTTP_RAW_POST_DATA != '') {
-            // is trying to evaluate a function.
-
-            // ejemplo :http://www.micodigo.com/webservice.php/functionname/xml?getjson&value1={json..}&value2={json}
-            //info(0)=0
-            //info(1)=functionname
-            //info(2)=serialize return type (optional, by default is the same name as passed)
-
-
-            $res = false;
-            switch ($methodcalled) {
-                case 'soap':
-                case 'wsdl':
-                    $res = $this->requestSOAP($HTTP_RAW_POST_DATA);
-                    break;
-                case 'json':
-                case 'rest':
-                case 'php':
-                case 'xml':
-                case 'none':
-
-                    $res = $this->requestNOSOAP($function_name, $function_out, $methodcalled, $isget, $info);
-                    break;
-            }
-            if ($res) {
+        if ($this->folderServer) {
+            @$save = @$_GET['save'];
+        } else {
+            $save = null;
+        }
+        switch ($paraminit) {
+            case 'soap':
+                $res = $this->requestSOAP($HTTP_RAW_POST_DATA);
                 $result .= $res;
                 return $result;
-            }
+            case 'json':
+            case 'rest':
+            case 'php':
+            case 'xml':
+            case 'none':
 
-            return false;
-        }
+                $res = $this->requestNoSOAP($functionName, $functionTypeOut, $paraminit, $isget, $HTTP_RAW_POST_DATA);
+                $result .= $res;
+                return $result;
 
-        switch ($paraminit) {
             case 'wsdl':
                 header('content-type:text/xml;charset=' . $this->encoding);
                 $result .= $this->genwsdl();
                 return $result;
             case 'source':
                 if ($this->verbose >= 2) {
-                    $source=@$_GET['source'];
-                    if(!$source) {
+                    $source = @$_GET['source'];
+                    if (!$source) {
                         header('content-type:text/html');
                         $result .= $this->source();
                         break;
                     }
-                    if(!isset($this->allowed_input[$source])) {
-                        $result.='Method not allowed';
+                    if (!isset($this->allowed_input[$source])) {
+                        $result .= 'Method not allowed';
                         return $result;
                     }
-                    if($this->allowed_input[$source]===false) {
-                        $result.='Method not allowed';
+                    if ($this->allowed_input[$source] === false) {
+                        $result .= 'Method not allowed';
                         return $result;
                     }
                     switch ($source) {
                         case 'php':
                             header('content-type:text/plain;charset=' . $this->encoding);
-                            $result .= $this->genphp();
+                            $result .= $this->generateServiceClass(true);
+                            if ($save) {
+                                echo "┌───────────────────────┐\n";
+                                echo "│        Saving         │\n";
+                                echo "└───────────────────────┘\n";
+                                $folder = $this->folderServer . '\service';
+                                if (@!mkdir($folder) && !is_dir($folder)) {
+                                    $this->lastError = "Directory $folder was not created";
+                                    return '';
+                                }
+                                $file = "$folder\\I{$this->nameWebService}Service.php";
+                                $r = file_put_contents($file, "<?php\n" . $result);
+                                if ($r) {
+                                    echo "Info: File $file saved\n";
+                                } else {
+                                    echo "Error: unable to save file $file\n";
+                                }
+                                $file = "$folder\\{$this->nameWebService}Service.php";
+                                if (!file_exists($file)) {
+                                    $r = file_put_contents($file, "<?php\n" . $this->generateServiceClass());
+                                    if ($r) {
+                                        echo "Info: File $file saved\n";
+                                    } else {
+                                        echo "Error: unable to save file $file\n";
+                                    }
+                                } else {
+                                    echo "Note: File $file already exist, skipped\n";
+                                }
+                                $file = "$folder\\{$this->nameWebService}Client.php";
+                                $result = $this->genphpclient();
+                                $r = file_put_contents($file, $result);
+                                if ($r) {
+                                    echo "Info: File $file saved\n";
+                                } else {
+                                    echo "Error: unable to save file $file\n";
+                                }
+
+                                echo "┌───────────────────────┐\n";
+                                echo "│         Done          │\n";
+                                echo "└───────────────────────┘\n";
+                            }
                             break;
                         case 'phpclient':
                             header('content-type:text/plain;charset=' . $this->encoding);
@@ -350,11 +530,11 @@ class CloudKing
                 }
                 break;
         }
-        if ($this->allowed_input['gui']===true) {
+        if ($this->allowed_input['gui'] === true) {
             $result .= $this->gen_description();
         } else {
             $result .= $this->html_header();
-            $result .= 'Name Web Service :' . $this->NAME_WS . '<br>';
+            $result .= 'Name Web Service :' . $this->nameWebService . '<br>';
             $result .= 'Method not allowed<br>';
             $result .= $this->html_footer();
         }
@@ -362,8 +542,8 @@ class CloudKing
     }
 
     private function security() {
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $hostname = gethostbyaddr($_SERVER['REMOTE_ADDR']);
+        $ip =(isset($_SERVER['REMOTE_ADDR']))?$_SERVER['REMOTE_ADDR']:'0.0.0.0';
+        $hostname = gethostbyaddr($ip);
         foreach ($this->disallowed as $value) {
             if ($value == $hostname || $value == $ip) {
                 echo("host $ip $hostname not allowed (blacklist)\n");
@@ -381,13 +561,13 @@ class CloudKing
 
     /**
      * It is called when we request a SOAP (a client called our web service as SOAP)
-     * 
+     *
      * @param $HTTP_RAW_POST_DATA
      *
      * @return string|string[]
      */
     private function requestSOAP($HTTP_RAW_POST_DATA) {
-        global $param, $r;
+        global $param, $resultService;
         $soapenv = '';
         if ($this->soap11 && strpos($HTTP_RAW_POST_DATA, 'http://schemas.xmlsoap.org/soap/envelope/')) {
             header('content-type:text/xml;charset=' . $this->encoding);
@@ -401,7 +581,7 @@ class CloudKing
             die('soap incorrect or not allowed');
         }
         $arr = $this->xml2array($HTTP_RAW_POST_DATA);
-        
+
         $this->wsse_username = @$arr['Envelope']['Header']['Security']['UsernameToken']['Username'];
         $this->wsse_password = @$arr['Envelope']['Header']['Security']['UsernameToken']['Password'];
         $this->wsse_nonce = @$arr['Envelope']['Header']['Security']['UsernameToken']['Nonce'];
@@ -415,109 +595,100 @@ class CloudKing
         } else {
             $this->wsse_password_type = 'None';
         }
-        $body=$arr['Envelope']['Body'];
+        $body = $arr['Envelope']['Body'];
 
         $funcion = array_keys($body);
-        $function_name0 = $funcion[0]; // as expressed in the xml
-        $function_name = $this->fixtag($function_name0); // "tem:getSix" (deberia ser solo una funcion?)
+        $functionNameXML = $funcion[0]; // as expressed in the xml
+        $functionName = $this->fixtag($functionNameXML); // "tem:getSix" (deberia ser solo una funcion?)
         // pasar los parametros
         $param = array();
 
-        $paramt = [];
         $i = 0;
-        $indice_operation = -1;
-        foreach ($this->operation as $key => $value) {
-            if ($value['name'] == $function_name) {
-                $indice_operation = $key;
-            }
-        }
-        if ($indice_operation >= 0) {
-            $my_operation = $this->operation[$indice_operation];
-            foreach ($my_operation['in'] as $value) {
-                $param[] = @$body[$function_name0][$value['name']];
-                
+        $myOperation = $this->findOperationByName($functionName);
+        if ($myOperation !== false) {
+
+            foreach ($myOperation['in'] as $key => $value) {
+                $param[] = @$body[$functionNameXML][$key];
+
                 if (empty($param[$i])) {
                     $param[$i] = '';
                 }
-                $paramt []= @$param[' . $i . '];
+
                 $i++;
             }
 
             if ($this->variable_type === 'object') {
                 // convert all parameters in classes.
-                foreach ($param as $key => $value) {
-                    $classname = $my_operation['in'][$key]['type'];
+                foreach ($param as $nameOperation => $value) {
+                    $classname = $myOperation['in'][$nameOperation]['type'];
 
                     if (strpos($classname, 'tns:', 0) !== false) {
-                   
-                        $param[$key] = $this->array2class($value, $this->fixtag($classname));
+
+                        $param[$nameOperation] = $this->array2class($value, $this->fixtag($classname));
                     }
 
                 }
             }
             //$param_count = count($param);
 
-            $r = '';
+            $resultService = '';
 
-            $evalret=false;
-            
-            if ($this->serviceInstance === null ) {
-                $evalret = array('soap:Fault' => 'Caught exception: no service instance');
-            } elseif(method_exists($this->serviceInstance,$function_name)) {
+            $errorSOAP = false;
+
+            if ($this->serviceInstance === null) {
+                $errorSOAP = $this->returnErrorSOAP('Caught exception: no service instance'
+                    , 'Caught exception: no service instance', 'Server');
+            } elseif (method_exists($this->serviceInstance, $functionName)) {
                 try {
-                    $r = $this->serviceInstance->$function_name(...$paramt);
-                } catch(\Exception $ex) {
-                    $evalret = array('soap:Fault' => 'Caught exception: '.$ex->getMessage());
+
+                    $resultService = $this->serviceInstance->$functionName(...$param);
+                } catch (RuntimeException $ex) {
+                    $errorSOAP = $this->returnErrorSOAP('Caught exception: ' . $ex->getMessage(),
+                        'Caught exception: ' . $ex->getMessage(), 'Server');
                 }
             } else {
-                $evalret = array('soap:Fault' => 'Caught exception: method not defined');
-            }
-            if ($this->variable_type === 'object') {
-                $classname = $my_operation['out'][0]['type'];
-                if (strpos($classname, 'tns:', 0) !== false) {
-                    //$ttype = $this->fixtag($classname);
-                    $r = $this->class2array($r, $this->fixtag($classname));
-
-
-                }
-                //$r=@$r[$ttype];
+                $errorSOAP = $this->returnErrorSOAP('Caught exception: method not defined ',
+                    'Caught exception: method not defined in service', 'Server');
             }
         } else {
-            $evalret = array('soap:Fault' => 'Caught exception: function not defined');
-        }
-        if (!isset($my_operation)) {
-            $evalret = array('soap:Fault' => 'Caught exception: no operation found');
-            return $evalret; // no operation
+            $errorSOAP = $this->returnErrorSOAP('Caught exception: method not defined ',
+                'Caught exception: method not defined in wsdl', 'Server');
         }
 
-        if (is_array($r)) {
+        if (is_array($resultService)) {
 
-            $objectName = @$my_operation['out'][0]['name'];
-            if (!$objectName) {
-                $classname = $my_operation['out'][0]['type'];
-                $objectName = $this->separateNS($classname);
+            //var_dump($myOperation);
+
+            $objectName = @$myOperation['out']['name'];
+            $classname = $objectName ? $myOperation['out']['type'] : '';
+
+            //var_dump($objectName);
+            //var_dump($r);
+            // the \n is for fixarray2xml
+
+            if (strpos($classname, 'tns:ArrayOf') === 0) {
+                $serial = "\n" . $this->array2xmlList($resultService, $classname)
+                    . "\n"; // the last \n is important to cut the last value
+            } else {
+                $serial = "\n" . $this->array2xml($resultService, 'array', false, false, $classname)
+                    . "\n"; // the last \n is important to cut the last value
             }
 
-            // the \n is for fixarray2xml
-            $serial = "\n" . $this->array2xml($r, 'array', false, false, $objectName) . "\n";
+            //var_dump($serial);
             $l = strlen($serial);
             if (($l > 2) && $serial[$l - 1] === "\n") {
                 $serial = substr($serial, 0, $l - 1);
             }
             $serial = $this->fixarray2xml($serial);
-            if (@$r['soap:Fault'] != '') {
-                $evalret = false;
-            }
 
         } else {
-            $serial = $r;
+            $serial = $resultService;
         }
         // agregamos si tiene valor byref.
         $extrabyref = '';
         $indice = 0;
-        $value = $this->operation[$indice_operation];
 
-        foreach ($value['in'] as $key2 => $value2) {
+        foreach ($myOperation['in'] as $key2 => $value2) {
             if (@$value2['byref']) {
                 $paramtmp = @$param[$indice];
                 if (is_array($paramtmp)) {
@@ -526,50 +697,55 @@ class CloudKing
                 } else {
                     $tmp2 = $paramtmp;
                 }
-                $extrabyref .= '<' . $value2['name'] . '>' . $tmp2 . '</' . $value2['name'] . '>';
+                $extrabyref .= '<' . $key2 . '>' . $tmp2 . '</' . $key2 . '>';
             }
             $indice++;
         }
 
-
-        if ($evalret === false) {
+        if ($errorSOAP === false) {
+            // no error
             $resultado = '<?xml version="1.0" encoding="' . $this->encoding . '"?>';
-            $resultado .= '<soap:Envelope xmlns:soap="' . $soapenv .
-                '" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body>' .
-                "\n";
-            $resultado .= "<{$function_name}Response xmlns=\"{$this->NAMESPACE}\">";
-            $resultado .= "<{$function_name}Result>{$serial}</{$function_name}Result>";
+            $resultado .= "<soap:Envelope xmlns:soap=\"{$soapenv}\" " .
+                'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' .
+                'xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body>';
+            $resultado .= "\n<{$functionName}Response xmlns=\"{$this->nameSpace}\">";
+            $resultado .= "<{$functionName}Result>{$serial}</{$functionName}Result>";
             $resultado .= $extrabyref;
-            $resultado .= "</{$function_name}Response>";
+            $resultado .= "</{$functionName}Response>";
             $resultado .= '</soap:Body>';
             $resultado .= '</soap:Envelope>';
         } else {
-            $resultado = '<soap:Envelope xmlns:soap="' . $soapenv .
-                '" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">' .
-                "\n";
-            $resultado .= '<soap:Body><soap:Fault><soap:Code><soap:Value>soap:Sender</soap:Value></soap:Code><soap:Reason><soap:Text xml:lang="en">' .
-                $function_name . ' failed to evaluate .' . @$evalret['soap:Fault'] . '</soap:Text></soap:Reason>';
-            $resultado .= '<soap:Detail/></soap:Fault></soap:Body></soap:Envelope>';
+            // error
+            $resultado = '<?xml version="1.0" encoding="' . $this->encoding . '"?>';
+            $resultado .= $errorSOAP;
         }
-
 
         return $resultado;
     }
-    public function returnErrorSOAP($soapVersion,$reason,$message,$code) {
-        if($soapVersion>=1.2) {
-            $xml=<<<TAG
+
+    /**
+     * @param string $reason
+     * @param string $message
+     * @param string $code =['VersionMismatch','MustUnderstand','Client','Server'][$i]
+     *
+     * @return string
+     */
+    public function returnErrorSOAP($reason, $message, $code) {
+
+        if ($this->soap12) {
+            $xml = <<<TAG
 <env:Envelope xmlns:env=http://www.w3.org/2003/05/soap-envelope>
    <env:Body>
       <env:Fault>
          <env:Code>
-            <env:Value>env:Sender</env:Value>
+            <env:Value>env:$code</env:Value>
          </env:Code>
          <env:Reason>
             <env:Text>$reason<env:Text>
          </env:Reason>
          <env:Detail>
             <e:myFaultDetails 
-               xmlns:e={$this->NAMESPACE}>
+               xmlns:e={$this->nameSpace}>
                <e:message>$message</e:message>
                <e:errorcode>$code</e:errorcode>
             </e:myFaultDetails>
@@ -579,17 +755,17 @@ class CloudKing
 </env:Envelope>
 TAG;
         } else {
-            $xml=<<<TAG
+            $xml = <<<TAG
 <soap:Envelope 
     xmlns:soap='http://schemas.xmlsoap.org/soap/envelope'>
    <soap:Body>
       <soap:Fault>
-         <faultcode>soap:VersionMismatch</faultcode>
+         <faultcode>soap:Server</faultcode>
          <faultstring>
             $message
          </faultstring>
          <faultactor>
-            {$this->NAMESPACE}
+            {$this->nameSpace}
          </faultactor>
       </soap:Fault>
    </soap:Body>
@@ -597,10 +773,12 @@ TAG;
 TAG;
 
         }
+        return $xml;
     }
+
     public function xml2array($xml) {
-        $parentKey=[];
-        $result=[];
+        $parentKey = [];
+        $result = [];
         $parser = xml_parser_create('');
         xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, 'utf-8');
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
@@ -608,23 +786,22 @@ TAG;
         @xml_parse_into_struct($parser, trim($xml), $xmls);
         xml_parser_free($parser);
 
-
-        foreach($xmls as $x) {
-            $type=@$x['type'];
-            $level=@$x['level'];
-            $value=@$x['value'];
-            $tag=@$x['tag'];
+        foreach ($xmls as $x) {
+            $type = @$x['type'];
+            $level = @$x['level'];
+            $value = @$x['value'];
+            $tag = @$x['tag'];
             switch ($type) {
                 case 'open':
-                    $ns=$this->separateNS($tag);
+                    $ns = $this->separateNS($tag);
                     /*if(!isset($parentKey[$level])) {
                         $parentKey[$level]=$ns;
                     } else {
                         $parentKey[$level]++;
                     }
                     */
-                    $parentKey[$level]=$ns;
-                    $this->addElementArray($result,$parentKey,$level,$ns,[]);
+                    $parentKey[$level] = $ns;
+                    $this->addElementArray($result, $parentKey, $level, $ns, []);
                     break;
                 case 'close':
                     //$parentKey[$level]++;
@@ -644,62 +821,72 @@ TAG;
      * $this->addElementArray($arr,['level1','level2'],3,'newlevel','hello']);
      * // $arr=['level1']['level2']['newlevel']=>'hello'
      * </pre>
-     * 
-     * @param array $array The result array.
-     * @param array $keys the parent node
-     * @param int $level the level where we will add a new node
-     * @param string $tag the tag of the new node
-     * @param mixed $value the value of the new node
+     *
+     * @param array  $array The result array.
+     * @param array  $keys  the parent node
+     * @param int    $level the level where we will add a new node
+     * @param string $tag   the tag of the new node
+     * @param mixed  $value the value of the new node
      */
-    private function addElementArray(&$array,$keys,$level,$tag,$value) {
+    private function addElementArray(&$array, $keys, $level, $tag, $value) {
         // we removed any namespace <exam:GetProducto> -> <GetProducto>
-        foreach($keys as $k=>$v) {
-            if(strpos($v,':')!==false) {
-                $keys[$k]=explode(':',$v,2)[1];
+        foreach ($keys as $k => $v) {
+            if (strpos($v, ':') !== false) {
+                $keys[$k] = explode(':', $v, 2)[1];
             }
         }
-        if(strpos($tag,':')!==false) {
-            $tag=explode(':',$tag,2)[1];
+        if (strpos($tag, ':') !== false) {
+            $tag = explode(':', $tag, 2)[1];
         }
         // we store the value form the xml in our array.
         switch ($level) {
             case 1:
-                $array[$tag]=$value;
+                $array[$tag] = $value;
                 break;
             case 2:
-                $array[$keys[1]][$tag]=$value;
+                $array[$keys[1]][$tag] = $value;
                 break;
             case 3:
-                $array[$keys[1]][$keys[2]][$tag]=$value;
+                $array[$keys[1]][$keys[2]][$tag] = $value;
                 break;
             case 4:
-                $array[$keys[1]][$keys[2]][$keys[3]][$tag]=$value;
+                $array[$keys[1]][$keys[2]][$keys[3]][$tag] = $value;
                 break;
             case 5:
-                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$tag]=$value;
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$tag] = $value;
                 break;
             case 6:
-                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$tag]=$value;
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$tag] = $value;
                 break;
             case 7:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
-                [$tag]=$value;
+                [$tag]
+                    = $value;
                 break;
             case 8:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
-                [$keys[7]][$tag]=$value;
+                [$keys[7]][$tag]
+                    = $value;
                 break;
             case 9:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
-                [$keys[7]][$keys[8]][$tag]=$value;
+                [$keys[7]][$keys[8]][$tag]
+                    = $value;
                 break;
             case 10:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
-                [$keys[7]][$keys[8]][$keys[9]][$tag]=$value;
+                [$keys[7]][$keys[8]][$keys[9]][$tag]
+                    = $value;
                 break;
             case 11:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
-                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$tag]=$value;
+                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$tag]
+                    = $value;
+                break;
+            case 12:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$keys[11]][$tag]
+                    = $value;
                 break;
         }
     }
@@ -718,13 +905,13 @@ TAG;
         $serialized_parts[2] = '"' . $newclass . '"';
         $result = unserialize(implode(':', $serialized_parts));
         // aqui recorremos los miembros
-        $idx = $this->findIdxComplexType($newclass);
-        if ($idx == -1) {
+        $complex = $this->findComplexByName($newclass);
+        if ($complex === false) {
             trigger_error('Complex Type ' . $newclass . ' not found', E_USER_ERROR);
         }
-        foreach ($this->complextype[$idx]['elements'] as $value) {
+        foreach ($complex as $nameComplex => $value) {
             if (strpos($value['type'], 'tns:', 0) !== false) {
-                $result->$value['name'] = $this->array2class($result->$value['name']
+                $result->$nameComplex = $this->array2class($result->$nameComplex
                     , $this->fixtag($value['type']));
             }
         }
@@ -736,10 +923,10 @@ TAG;
         if (is_object($class)) {
             $resultado = (array)$class;
 
-            $idx = $this->findIdxComplexType($classname);
-            foreach ($this->complextype[$idx]['elements'] as $value) {
+            $complex = $this->findComplexByName($classname);
+            foreach ($complex as $nameComplex => $value) {
                 if (strpos($value['type'], 'tns:', 0) !== false) {
-                    $this->class2array($resultado[$value['name']], $this->fixtag($value['type']));
+                    $this->class2array($resultado[$nameComplex], $this->fixtag($value['type']));
                     //$tmp=$this->class2array($resultado[$value['name']], $this->fixtag($value['type']));
                     //if ($tmp != "") {
                     //$resultado[$value['name']]=$tmp;
@@ -752,17 +939,6 @@ TAG;
         return $resultado;
     }
 
-    private function findIdxComplexType($complexname) {
-
-        foreach ($this->complextype as $key => $value) {
-            if ($value['name'] == $complexname) {
-                return $key;
-            }
-        }
-        return -1;
-
-    }
-
     protected function fixtag($tag) {
         $arr = explode(':', $tag);
         return ($arr[count($arr) - 1]);
@@ -770,6 +946,7 @@ TAG;
 
     /**
      * @param $tnsName
+     *
      * @return mixed|string
      */
     private function separateNS($tnsName) {
@@ -780,27 +957,57 @@ TAG;
         return $r[1];
     }
 
-    public function array2xml($array, $name = 'root', $contenttype = true, $start = true, $keyx = '') {
+    /**
+     * It generates a xml form an array.
+     *
+     * @param string|array $array       the input array
+     * @param string       $name        The name of the first node
+     * @param bool         $contenttype if true then it shows the initial content type
+     * @param bool         $start       if true then it is the first and initial node.
+     * @param string       $expected    The expected node type with the namespace
+     *
+     * @return string
+     */
+    public function array2xml($array, $name = 'root', $contenttype = true, $start = true, $expected = '') {
         // \n is important, you should not remove it.
         if (!is_array($array)) {
             return $array;
+        }
+        //var_dump($expected);
+        //var_dump($name);
+        //var_dump($start);
+        if (strpos($expected, 'tns:') !== false) {
+            //echo "expected:";
+            //var_dump($expected);
+            $complex = $this->findComplexByName(str_replace('tns:', '', $expected));
+            //echo "complex:";
+            //var_dump($complex);
+        } else {
+            //echo "nexpected:";
+            //var_dump($expected);
+            $complex = null;
         }
 
         $xmlstr = '';
         if ($start) {
             if ($contenttype) {
-                @header('content-type:text/xml;charset=' . $this->encoding);
+                @header("content-type:text/xml;charset={$this->encoding}");
             }
-            $xmlstr .= '<?xml version="1.0" encoding="' . $this->encoding . "\"?>\n";
-            $xmlstr .= '<' . $name . ">\n";
+            $xmlstr .= "<?xml version=\"1.0\" encoding=\"{$this->encoding}\"?>\n";
+            $xmlstr .= "<{$name}>\n";
         }
 
         foreach ($array as $key => $child) {
             if (is_array($child)) {
-                $xmlstr .= (is_string($key)) ? '<' . $key . ">\n" : '<' . $keyx . ">\n";
-                $child = $this->array2xml($child, '', '', false, $key);
+                $xmlstr .= "<{$key}>\n";
+                if (strpos($complex[$key]['type'], 'tns:ArrayOf') === 0) {
+                    $child = $this->array2xmlList($child, $complex[$key]['type']);
+                } else {
+                    $child = $this->array2xml($child, '', '', false, $complex[$key]['type']);
+                }
+
                 $xmlstr .= $child;
-                $xmlstr .= (is_string($key)) ? '</' . $key . ">\n" : '</' . $keyx . ">\n";
+                $xmlstr .= "</{$key}>\n";
             } else {
                 $type = $this->array2xmltype($child);
                 if ($this->variable_type === 'object' && is_object($child)) {
@@ -814,6 +1021,32 @@ TAG;
         }
         if ($start) {
             $xmlstr .= '</' . $name . ">\n";
+        }
+        return $xmlstr;
+    }
+
+    /** @noinspection LoopWhichDoesNotLoopInspection */
+    private function array_key_first($arr) {
+        foreach ($arr as $key => $unused) {
+            return $key;
+        }
+        return null;
+    }
+
+    public function array2xmlList($array, $expected = '') {
+        // \n is important, you should not remove it.
+        if (!is_array($array)) {
+            return $array;
+        }
+        $xmlstr = '';
+        $keyName = str_replace('tns:', '', $expected);
+        $complex = $this->findComplexByName($keyName);
+        $firstKey = $this->array_key_first($complex);
+        //var_dump('list');
+        //var_dump($complex);
+        foreach ($array as $idx => $value) {
+            $xmlstr .= "<$firstKey>" . $this->array2xml($value, '', '', false, $complex[$firstKey]['type'])
+                . "</$firstKey>\n";
         }
         return $xmlstr;
     }
@@ -849,10 +1082,18 @@ TAG;
         return $resultado;
     }
 
-    private function requestNOSOAP($function_name, $function_out, $methodcalled, $isget, $info = array()) {
-        global $param, $r;
-
-
+    /**
+     * Process a non-soap request into an array.
+     *
+     * @param string $functionName    the name of the function
+     * @param string $functionTypeOut =['json','xml','php','none'][$i]
+     * @param string $methodcalled    =['soap','wsdl','json','rest','php','xml','none'][$i]
+     * @param string $isget
+     * @param array  $body
+     *
+     * @return false|string
+     */
+    private function requestNoSOAP($functionName, $functionTypeOut, $methodcalled, $isget, $body = array()) {
         $this->wsse_username = @$_POST['Username'];
         $this->wsse_password = @$_POST['Password'];
         $this->wsse_nonce = @$_POST['Nonce'];
@@ -866,96 +1107,59 @@ TAG;
         } else {
             $this->wsse_password_type = 'None';
         }
-        // pasar los parametros
-        $param = array();
 
-        $paramt = '';
-
-        $indice_operation = -1;
-        foreach ($this->operation as $key => $value) {
-            if ($value['name'] == $function_name) {
-                $indice_operation = $key;
-            }
-        }
-        $operation = array('in' => array());
-        if ($indice_operation >= 0) {
-            $i = 0;
-            $operation = $this->operation[$indice_operation];
-            foreach ($operation['in'] as $key => $value) {
-                $tmpvalue = ($isget) ? @$_GET[$value['name']] : @$_POST[$value['name']];
-                if ($methodcalled === 'rest') {
-                    $param[] = @$info[$i + 3];
-                } else {
-                    $param[] = $this->decodeNOSOAP($methodcalled, $tmpvalue);
-                }
-                $paramt .= '@$param[' . $i . '],';
-                $i++;
-            }
-            if ($this->variable_type === 'object') {
-                // convert all parameters in classes.				
-                foreach ($param as $key => $value) {
-                    $classname = $operation['in'][$key]['type'];
-                    if (strpos($classname, 'tns:', 0) !== false) {
-                        $param[$key] = $this->array2class($value, $this->fixtag($classname));
-                    }
-                }
-            }
-            // $param_count = count($param);
-            $paramt = substr($paramt, 0, -1);
-            $r = '';
-            if (!$this->serviceInstance) {
-                $evalstr = "\$r=$function_name($paramt);";
+        $operationN = $this->findOperationByName($functionName);
+        if ($operationN != false) {
+            $operation = $operationN;
+            if ($isget) {
+                $param = $_GET;
             } else {
-                //@eval("global \$" . $this->serviceInstance . ";");
-                $evalstr = "\$r=\$this->serviceInstance->$function_name($paramt);";
-
+                $param = $this->decodeNOSOAP($methodcalled, $body);
             }
+            // order and filter the arguments.
+            $arguments = [];
+            $argumentCounter = 0;
+            $paramxArgument = [];
+            foreach ($operation['in'] as $nameArg => $value) {
+                if (isset($param[$nameArg])) {
+                    $arguments[$argumentCounter] = $param[$nameArg];
 
-            $evalret = eval($evalstr);
-
-            if ($this->variable_type === 'object') {
-
-
-                $r = $this->class2array($r, $this->fixtag($operation['out'][0]['type']));
-
+                    $paramxArgument[$nameArg] = $argumentCounter;
+                    $argumentCounter++;
+                } else {
+                    $arguments[$argumentCounter] = null;
+                    $paramxArgument[$nameArg] = $argumentCounter;
+                    $argumentCounter++;
+                }
+            }
+            try {
+                $er = $this->serviceInstance->$functionName(...$arguments);
+            } catch (RuntimeException $ex) {
+                return $this->returnErrorNoSOAP($functionTypeOut, 'Caught exception: ' . $ex->getMessage(),
+                    'Caught exception: ' . $ex->getMessage(), 'Server');
+            }
+            $evalret = null;
+            if (count($operation['out'])) {
+                $returnArgName = $operation['out']['name'];
+                $evalret[$returnArgName] = $er;
+            }
+            foreach ($operation['in'] as $nameArg => $value) {
+                if (isset($paramxArgument[$nameArg]) && $value['byref']) {
+                    $evalret[$nameArg] = $arguments[$paramxArgument[$nameArg]];
+                } else {
+                    $evalret[$nameArg] = null;
+                }
             }
         } else {
-            $evalret = array('soap:Fault' => 'Caught exception: function not defined');
+            return $this->returnErrorNoSOAP($functionTypeOut, 'Caught exception: function not defined'
+                , 'Caught exception: function not defined', 'Server');
         }
+        return $this->encodeNOSOAP($functionTypeOut, $evalret, $functionName . 'Result');
+    }
 
-        $max_result = array();
-
-
-        $max_result[$function_name . 'Result'] = $r;
-
-        // agregamos si tiene valor byref.
-        //$extrabyref = "";
-        $indice = 0;
-
-        foreach ($operation['in'] as $key2 => $value2) {
-            if (@$value2['byref']) {
-                $paramtmp = @$param[$indice];
-                $max_result[$value2['name']] = $paramtmp;
-               // $extrabyref .= $value2['name'] . "=" . $paramtmp . "\n";
-            }
-            $indice++;
-        }
-
-        if (count($max_result) === 1) {
-
-            $max_result = $r; // if not byref then we returned as a single value
-        }
-
-        if ($evalret !== false) {
-
-            $resultado = $max_result;
-        } else {
-            $resultado = $r;
-        }
-
-
-        $resultado = $this->encodeNOSOAP($function_out, $resultado, $function_name . 'Result');
-        return $resultado;
+    private function returnErrorNoSOAP($methodcalled, $reason, $message, $code) {
+        return $this->decodeNOSOAP($methodcalled,
+            ['origin' => 'Cloudking Error', 'reason' => $reason, 'message' => $message, 'code' => $code]);
     }
 
     private function decodeNOSOAP($methodcalled, $tmpvalue) {
@@ -963,7 +1167,7 @@ TAG;
         $tmp = '';
         switch ($methodcalled) {
             case 'json':
-                $tmp = json_decode($tmpvalue,false);
+                $tmp = json_decode($tmpvalue, true);
                 break;
             case 'xml':
                 $this->xml2array($tmpvalue);
@@ -981,16 +1185,17 @@ TAG;
         return $tmp;
     }
 
-    private function encodeNOSOAP($methodcalled, $tmpvalue, $tmpname) {
+    private function encodeNOSOAP($functionTypeOut, $tmpvalue, $tmpname) {
         $tmp = '';
-        switch ($methodcalled) {
+        switch ($functionTypeOut) {
             case 'json':
+                @header('Content-type: application/json');
                 $tmp = json_encode($tmpvalue);
                 break;
             case 'xml':
                 if (!is_array($tmpvalue)) {
                     @header('content-type:text/xml;charset=' . $this->encoding);
-                    $tmp = '<' . '?' . 'xml version="1.0" encoding="' . $this->encoding . '"' . '?' . '>' . "\n";
+                    $tmp = "<?xml version=\"1.0\" encoding=\"{$this->encoding}\"?>\n";
                     $tmp .= "<$tmpname>$tmpvalue</$tmpname>";
                 } else {
                     $tmp = $this->array2xml($tmpvalue, 'array', true, true);
@@ -1016,79 +1221,138 @@ TAG;
         return $tmp;
     }
 
-    protected function genphp() {
-        
-        $r=<<<cin
+    protected function generateServiceClass($interface = false) {
+        $namespacephp = str_replace(['http://', 'https://', '.', '/'], ['', '', '\\', '\\'], $this->nameSpace);
+        $namespacephp = rtrim($namespacephp, '\\');
+        if ($interface) {
+            $r = <<<cin
+namespace $namespacephp\service;
+/**
+ * @generated The structure of this interface is generated by CloudKing
+ * Interface I{$this->nameWebService}Service
+ */
+interface I{$this->nameWebService}Service {
+cin;
+        } else {
+            $r = <<<cin
+namespace $namespacephp\service;
+// file:{$this->nameWebService}Service.php
 /**
  * @generated The structure of this class is generated by CloudKing
- * Class {$this->NAME_WS}Service
+ * Class {$this->nameWebService}Service
  */
-class {$this->NAME_WS}Service {
+class {$this->nameWebService}Service implements I{$this->nameWebService}Service {
 cin;
+        }
 
-
-        foreach ($this->operation as $key => $value) {
+        foreach ($this->operation as $complexName => $args) {
             $param = '';
-            foreach ($value['in'] as $key2 => $value2) {
+            foreach ($args['in'] as $key2 => $value2) {
                 $param .= ($value2['byref']) ? '&' : '';
-                $param .= '$' . $value2['name'] . ', ';
-
+                $param .= '$' . $key2 . ', ';
             }
             if ($param != '') {
                 $param = $this->right($param, 2);
             }
-            $r .= "\n";
-            $r .= "\tpublic function " . $value['name'] . "($param) {\n";
-            $r .= "\t\ttry {\n";
-
-            $r .= "\t\t\t// todo: missing implementation \n";
-            $r .= "\t\t\t/*\n";
-            $param = '';
-            foreach ($value['in'] as $key2 => $value2) {
-                $param .= "\t\t\t\$_" . $value2['name'] . '=' .
-                    $this->Param2PHPValue($value2['type'], $value2['maxOccurs']) . ";\n";
+            $phpdoc = "\t/**\n\t * {$args['description']}\n\t *\n";
+            foreach ($args['in'] as $key2 => $value2) {
+                $phpdoc .= "\t * @param mixed \${$key2}\n";
+            }
+            if (is_array($args['out']) && count($args['out']) > 0) {
+                $phpdoc .= "\t *\n\t * @return mixed\n";
+            }
+            $phpdoc .= "\t */";
+            if ($interface) {
+                $r .= "\n$phpdoc\n";
+                $r .= "\tpublic function {$complexName}($param);\n";
+            } else {
+                $r .= "\n";
+                $r .= "\n\t/**\n\t * @inheritDoc\n\t */\n";
+                $r .= "\tpublic function {$complexName}($param) {\n";
+                $r .= "\t\t// todo:custom implementation goes here\n";
+                $r .= "\t}\n";
             }
 
-            $r .= $param;
-            $r .= "\t\t\t*/\n";
-            $r .= "\t\t\t// End Input Values \n";
-            foreach ($value['out'] as $key2 => $value2) {
-                $r .= "\t\t\t\$_" . $value['name'] . 'Result=' .
-                    $this->Param2PHPValue($value2['type'], $value2['maxOccurs']) . ";\n";
-            }
-            foreach ($value['out'] as $key2 => $value2) {
-
-                $param .= $this->Param2PHPvalue($value2['type'], $value2['maxOccurs']);
-
-            }
-            //$r.="\t\t \$result=\$_".$value['name']."Result ".$param."; \n";
-            $r .= "\t\t\t return \$_" . $value['name'] . "Result; \n";
-            $r .= "\t\t} catch (Exception \$_exception) {\n";
-            $r .= "\t\t\treturn(array(\"soap:Fault\"=>'Caught exception: '. \$_exception->getMessage()));\n";
-            $r .= "\t\t}\n";
-            $r .= "\t}\n";
         }
-        foreach ($this->complextype as $key => $value) {
-            
-            
-            $r.="\n\tpublic function factory".$value['name']. '('
-                .$this->Param2PHPArg('tns:' . $value['name'], @$value['maxOccurs'],','). ') {';
+        foreach ($this->complextype as $complexName => $args) {
+            $params = '';
+            foreach ($args as $key2 => $value2) {
+                $params .= '$' . $key2 . '=null, ';
+            }
+            if ($params != '') {
+                $params = $this->right($params, 2);
+            }
+            if ($interface) {
+                $r .= "\n\tpublic static function factory" . $complexName . '(' . $params . ");\n";
+            } else {
+                $r .= "\n\tpublic static function factory" . $complexName . '(' . $params . ') {';
+                $r .= "\n";
+                $r .= $this->Param2PHP('tns:' . $complexName, @$args['maxOccurs']) . "\n";
+                $r .= "\t\treturn \$_$complexName;\n";
+                $r .= "\t}\n";
+            }
+        }
+        $r .= "} // end class \n ";
+
+        /*$r .= "\n" . $this->genphpast('Complex Types (Classes)');
+        foreach ($this->complextype as $complexName => $args) {
+            $r .= "\nclass " . $complexName . " {\n";
+            foreach ($args as $key2 => $value2) {
+                $r .= "\tvar $" . $key2 . '; // ' . $value2['type'] . "\n";
+            }
+            $r .= "}\n";
+        }
+        */
+        return $r;
+    }
+
+    private function createArgument($argArray) {
+        $param = '';
+        foreach ($argArray as $key2 => $value2) {
+            $param .= ($value2['byref']) ? '&' : '';
+            $param .= '$' . $key2 . ', ';
+        }
+        if ($param != '') {
+            $param = $this->right($param, 2);
+        }
+        return $param;
+    }
+
+    protected function generateServiceInterface() {
+
+        $r = <<<cin
+/**
+ * @generated The structure of this interface is generated by CloudKing
+ * Interface I{$this->nameWebService}Service
+ */
+interface I{$this->nameWebService}Service {
+cin;
+
+        foreach ($this->operation as $complexName => $args) {
+            $param = $this->createArgument($args['in']);
             $r .= "\n";
-            $r .= $this->Param2PHP('tns:' . $value['name'], @$value['maxOccurs']) . "\n";
-            $r.="\n\t }\n";
+            $r .= "\tpublic function " . $complexName . "($param);\n";
+        }
+        foreach ($this->complextype as $complexName => $args) {
+            $params = count($args) > 0 ? '$' . implode(',$', array_keys($args)) : '';
+
+            $r .= "\n\tpublic static function factory" . $complexName . '(' . $params . ') {';
+            $r .= "\n";
+            $r .= $this->Param2PHP('tns:' . $complexName, @$args['maxOccurs']) . "\n";
+            $r .= "\t\treturn \$_$complexName;\n";
+            $r .= "\t}\n";
         }
         $r .= "} // end class \n ";
 
         $r .= "\n" . $this->genphpast('Complex Types (Classes)');
-        foreach ($this->complextype as $key => $value) {
-            $r .= "\nclass " . $value['name'] . " {\n";
-            foreach ($value['elements'] as $key2 => $value2) {
-                $r .= "\tvar $" . $value2['name'] . '; // ' . $value2['type'] . "\n";
+        foreach ($this->complextype as $complexName => $args) {
+            $r .= "\nclass " . $complexName . " {\n";
+            foreach ($args as $key2 => $value2) {
+                $r .= "\tvar $" . $key2 . '; // ' . $value2['type'] . "\n";
             }
             $r .= "}\n";
         }
-        
-        
+
         return $r;
     }
 
@@ -1107,11 +1371,11 @@ cin;
     }
 
     protected function Param2PHPvalue($type, $max) {
-        $x1 = explode(':', $type,2);
+        $x1 = explode(':', $type, 2);
         if (count($x1) != 2) {
             return "// type $type not defined ";
         }
-        list($space,$name)=$x1;
+        list($space, $name) = $x1;
         $p = '';
         if ($space === 's') {
             if (!in_array($name, $this->predef_types)) {
@@ -1125,8 +1389,8 @@ cin;
             }
         }
         if ($space === 'tns') {
-            foreach ($this->complextype as $key => $value) {
-                if ($name == $value['name']) {
+            foreach ($this->complextype as $complexName => $args) {
+                if ($name === $complexName) {
                     $p = '$_' . $name;
                 }
             }
@@ -1152,12 +1416,12 @@ cin;
         return "\\ complex type $type not defined";
     }
 
-    protected function Param2PHP($type, $max, $separator=";\n",$pre="\t\t") {
-        $x1 = explode(':', $type,2);
+    protected function Param2PHP($type, $max, $separator = ";\n", $pre = "\t\t") {
+        $x1 = explode(':', $type, 2);
         if (count($x1) != 2) {
             return "// type $type not defined ";
         }
-        list($space,$name)=$x1;
+        list($space, $name) = $x1;
         if ($space === 's') {
             if (!in_array($name, $this->predef_types)) {
                 return "// type $type not found";
@@ -1178,12 +1442,12 @@ cin;
         }
         $resultado = '';
         if ($space === 'tns') {
-            foreach ($this->complextype as $key => $value) {
-                if ($name == $value['name']) {
+            foreach ($this->complextype as $complexName => $args) {
+                if ($name == $complexName) {
 
-                    foreach ($value['elements'] as $key2 => $value2) {
-                        $resultado .= $pre. '$_' . $name . "['" . $value2['name'] . "']=$" .
-                            $value2['name'] . $separator;
+                    foreach ($args as $key2 => $value2) {
+                        $resultado .= $pre . '$_' . $name . "['" . $key2 . "']=$" .
+                            $key2 . $separator;
                         //$resultado.="'".$value2['name']."'=>".$this->Param2PHP($value2['type'],$value2['maxOccurs']).",";                    
                     }
                     $resultado = $this->right($resultado);
@@ -1194,12 +1458,13 @@ cin;
         }
         return '';
     }
-    protected function Param2PHPArg($type, $max, $separator=";\n") {
-        $x1 = explode(':', $type,2);
+
+    protected function Param2PHPArg($type, $max) {
+        $x1 = explode(':', $type, 2);
         if (count($x1) != 2) {
             return "// type $type not defined ";
         }
-        list($space,$name)=$x1;
+        list($space, $name) = $x1;
         if ($space === 's') {
             if (!in_array($name, $this->predef_types)) {
                 return "// type $type not found";
@@ -1220,12 +1485,12 @@ cin;
         }
         $resultado = '';
         if ($space === 'tns') {
-            foreach ($this->complextype as $key => $value) {
-                if ($name == $value['name']) {
+            foreach ($this->complextype as $complexName => $args) {
+                if ($name === $complexName) {
 
-                    foreach ($value['elements'] as $key2 => $value2) {
-                        $resultado .= '$' . $value2['name'] . '=' .
-                            $this->Param2PHPValue($value2['type'], $value2['maxOccurs']) . $separator;
+                    foreach ($args as $key2 => $value2) {
+                        $resultado .= '$' . $key2; // . '=' .
+                        //    $this->Param2PHPValue($value2['type'], $value2['maxOccurs']) . $separator;
                         //$resultado.="'".$value2['name']."'=>".$this->Param2PHP($value2['type'],$value2['maxOccurs']).",";                    
                     }
                     $resultado = $this->right($resultado);
@@ -1238,28 +1503,32 @@ cin;
     }
 
     /**
-     * @param float $soap The default SOAP.
      *
      * @return string
      */
-    protected function genphpclient($soap=1.1) {
-        $namespacephp=str_replace(['http://','https://','.'],['','','\\'],$this->NAMESPACE);
+    protected function genphpclient() {
+        $namespacephp = str_replace(['http://', 'https://', '.','/'], ['', '', '\\','\\'], $this->nameSpace);
+        $namespacephp=trim($namespacephp,'\\');
         $r = "<?php\n";
+        $r .= "/** @noinspection DuplicatedCode\n";
+        $r .= " * @noinspection UnknownInspectionInspection\n";
+        $r .= " */\n";
         $r .= "namespace $namespacephp;\n";
         $r .= "use eftec\\cloudking\\CloudKingClient;\n\n";
         $r .= "/**\n";
-        $r .= " * Class {$this->NAME_WS}Client<br>\n";
+        $r .= " * Class {$this->nameWebService}Client<br>\n";
         if ($this->description) {
             $r .= " * {$this->description}<br>\n";
         }
-        $r .= " * This code was generated automatically using CloudKing v{$this->version}, Date:".date('r')." <br>\n";
-        $r .= ' * Using the web:' .$this->FILE."?source=phpclient\n";
+        $r .= " * This code was generated automatically using CloudKing v{$this->version}, Date:" . date('r')
+            . " <br>\n";
+        $r .= ' * Using the web:' . $this->portUrl . "?source=phpclient\n";
         $r .= " */\n";
-        $r .= "class {$this->NAME_WS}Client {\n";
+        $r .= "class {$this->nameWebService}Client {\n";
         $r .= "\t/** @var string The full url where is the web service */\n";
-        $r .= "\tprotected \$url='" . $this->FILE . "';\n";
+        $r .= "\tprotected \$url='" . $this->portUrl . "';\n";
         $r .= "\t/** @var string The namespace of the web service */\n";
-        $r .= "\tprotected \$tempuri='" . $this->NAMESPACE . "';\n";
+        $r .= "\tprotected \$tempuri='" . $this->nameSpace . "';\n";
         $r .= "\t/** @var string The last error. It is cleaned per call */\n";
         $r .= "\tpublic \$lastError='';\n";
         $r .= "\t/** @var float=[1.1,1.2][\$i] The SOAP used by default */\n";
@@ -1280,37 +1549,36 @@ cin;
         $r .= "\t\t\$soap!==null and \$this->soap = \$soap;\n";
         $r .= "\t\t\$this->service=new CloudKingClient(\$this->soap,\$this->tempuri);\n";
         $r .= "\t}\n\n";
-        
-        
+
         foreach ($this->operation as $key => $value) {
-            $functionname = $value['name'];
-            if (isset($value['out'])) {
-                $outType=$value['out'][0]['type'];
+            $functionname = $key;
+            if (isset($value['out']) && count($value['out']) > 0) {
+                $outType = $value['out']['type'];
             } else {
-                $outType='void';
+                $outType = 'void';
             }
             $param = '';
             foreach ($value['in'] as $key2 => $value2) {
                 $param .= ($value2['byref']) ? '&' : '';
-                $param .= '$' . $value2['name'] . ', ';
+                $param .= '$' . $key2 . ', ';
 
             }
             if ($param != '') {
                 $param = $this->right($param, 2);
             }
-            $r.="\n\t/**\n";
-            $r.="\t * ".@$value['description']."\n";
-            $r.="\t *\n";
+            $r .= "\n\t/**\n";
+            $r .= "\t * " . @$value['description'] . "\n";
+            $r .= "\t *\n";
             foreach ($value['in'] as $key2 => $value2) {
-                $varname = $value2['name'];
-                $r .= "\t * @param mixed \$$varname " . @$value2['description'] . ' ('.@$value2['type'].") \n";
+                $varname = $key2;
+                $r .= "\t * @param mixed \$$varname " . @$value2['description'] . ' (' . @$value2['type'] . ") \n";
             }
-            $r .=   "\t * @return mixed ($outType)\n";
-            $r .=   "\t * @noinspection PhpUnused */\n";
+            $r .= "\t * @return mixed ($outType)\n";
+            $r .= "\t * @noinspection PhpUnused */\n";
             $r .= "\tpublic function $functionname($param) {\n";
             $r .= "\t\t\$_param='';\n";
             foreach ($value['in'] as $key2 => $value2) {
-                $varname = $value2['name'];
+                $varname = $key2;
                 $r .= "\t\t\$_param.=\$this->service->array2xml(\$$varname,'ts:$varname',false,false);\n";
             }
             $r .= "\t\t\$resultado=\$this->service->loadurl(\$this->url,\$_param,'$functionname');\n";
@@ -1320,14 +1588,14 @@ cin;
             $r .= "\t\t}\n";
             foreach ($value['in'] as $key2 => $value2) {
                 if ($value2['byref']) {
-                    $r .= "\t\t\$" . $value2['name'] . "=@\$resultado['" . $value2['name'] . "'];\n";
+                    $r .= "\t\t\$" . $key2 . "=@\$resultado['" . $key2 . "'];\n";
                 }
             }
             $r .= "\t\treturn @\$resultado['" . $functionname . "Result'];\n";
             $r .= "\t}\n";
 
         }
-        $r .= "} // end {$this->NAME_WS}Client\n";
+        $r .= "} // end {$this->nameWebService}Client\n";
         return $r;
     }
 
@@ -1343,25 +1611,26 @@ using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-public class ' . $this->NAME_WS . ' : MonoBehaviour
+public class ' . $this->nameWebService . ' : MonoBehaviour
 {
     // Use this for initialization
     private string charset = "UTF-8";
-    private string url = "' . $this->FILE . '";
-    private string tempuri = "' . $this->NAMESPACE . '";
+    private string url = "' . $this->portUrl . '";
+    private string tempuri = "' . $this->nameSpace . '";
     private string prefixns = "ts";
 	public string cookie="";	
     ';
 
-        foreach ($this->operation as $key => $value) {
-            $tmpname = $value['name'];
-            if (count($value['out']) >= 1) {
-                $outtype = $this->fixtag($value['out'][0]['type']);
-                $outtypereal = $this->type2csharp($outtype);
-            } else {
-                $outtypereal = '';
-            }
-            $r .= '	
+        foreach ($this->operation as $complexName => $args) {
+            foreach ($args as $argname => $v) {
+                $tmpname = $argname;
+                if (isset($value['out']) && count($v['out']) >= 1) {
+                    $outtype = $this->fixtag($v['out']['type']);
+                    $outtypereal = $this->type2csharp($outtype);
+                } else {
+                    $outtypereal = '';
+                }
+                $r .= '	
     // ' . $tmpname . '
     public Boolean is' . $tmpname . 'Running = false;
     private WWW webservice' . $tmpname . ';
@@ -1370,44 +1639,45 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     public ' . $outtypereal . ' ' . $tmpname . 'Result;
     // End ' . $tmpname . '
 ';
+            }
         }
         $r .= ' 	private void Start()
 	{
 		return;
 	}';
-        foreach ($this->operation as $key => $value) {
-            $tmpname = $value['name'];
-            $param = '';
-            foreach ($value['in'] as $key2 => $value2) {
-                $param .= $this->fixtag($value2['type']) . ' ' . $value2['name'] . ',';
-            }
-            $param = $this->right($param, 1);
-            $r .= ' 
+        foreach ($this->operation as $complexName => $args) {
+            foreach ($args as $argname => $v) {
+                $tmpname = $argname;
+                $param = '';
+                foreach ($v['in'] as $key2 => $value2) {
+                    $param .= $this->fixtag($value2['type']) . ' ' . $key2 . ',';
+                }
+                $param = $this->right($param, 1);
+                $r .= ' 
 	private void ' . $tmpname . 'Async(' . $param . ')
         {
 		string namefunction = "' . $tmpname . '";
 		Single soapVersion=1.1f;
                 string ss2 = SoapHeader(namefunction,soapVersion);';
 
-            foreach ($value['in'] as $key2 => $value2) {
-                $name = $value2['name'];
-                $r .= '
+                foreach ($v['in'] as $key2 => $value2) {
+                    $name = $key2;
+                    $r .= '
 		ss2 += "<" + prefixns + ":' . $name . '>" + Obj2XML(' . $name . ',true) + "</" + prefixns + ":' . $name . '>";
 		';
-            }
+                }
 
-            if (count($value['out']) >= 1) {
-                $outtype = $this->fixtag($value['out'][0]['type']);
-                $outtypereal = $this->type2csharp($outtype);
-                $outinit = $this->csharp_init($outtype);
-            } else {
-                $outtype = '';
-                $outtypereal = '';
-                $outinit = '';
-            }
+                if (isset($value['out']) && count($v['out']) >= 1) {
+                    $outtype = $this->fixtag($v['out']['type']);
+                    $outtypereal = $this->type2csharp($outtype);
+                    $outinit = $this->csharp_init($outtype);
+                } else {
+                    $outtype = '';
+                    $outtypereal = '';
+                    $outinit = '';
+                }
 
-
-            $r .= 'ss2 += SoapFooter(namefunction,soapVersion);
+                $r .= 'ss2 += SoapFooter(namefunction,soapVersion);
                 is' . $tmpname . 'Running = true;
 		StartCoroutine(' . $tmpname . 'Async2(ss2));
        }
@@ -1426,25 +1696,27 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
                 is' . $tmpname . 'Running = false;
                 string other = cleanSOAPAnswer(webservice' . $tmpname . '.text, "' . $tmpname . '",ref ' . $tmpname . 'Error);
 		';
-            if ($outtype != '') {
-                $r .= $tmpname . 'Result=' . $outinit . ";\n";
-                $r .= '                ' . $tmpname . 'Result=(' . $outtypereal . ')XML2Obj(other,"' . $outtype . '",' .
-                    $tmpname . 'Result.GetType());	
+                if ($outtype != '') {
+                    $r .= $tmpname . 'Result=' . $outinit . ";\n";
+                    $r .= '                ' . $tmpname . 'Result=(' . $outtypereal . ')XML2Obj(other,"' . $outtype
+                        . '",' .
+                        $tmpname . 'Result.GetType());	
 		';
-            }
-            $r .= 'webservice' . $tmpname . '.responseHeaders.TryGetValue("SET-COOKIE",out cookie);
+                }
+                $r .= 'webservice' . $tmpname . '.responseHeaders.TryGetValue("SET-COOKIE",out cookie);
 		';
-            $r .= $tmpname . 'AsyncDone();
+                $r .= $tmpname . 'AsyncDone();
 	}
 	public void ' . $tmpname . 'AsyncDone() {
 		// we do something...';
-            if ($outtype != '') {
-                $r .= '
+                if ($outtype != '') {
+                    $r .= '
 		// ' . $outtypereal . ' dnx=' . $tmpname . 'Result;';
-            }
-            $r .= '
+                }
+                $r .= '
 	}
 	';
+            }
         }
 
         $r .= '
@@ -1598,28 +1870,25 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
 	';
 
         $r .= "\n" . $this->genphpast('Complex Types (Classes)');
-        foreach ($this->complextype as $key => $value) {
-            $type = $this->fixtag(@$value['type']);
+        foreach ($this->complextype as $complexName => $args) {
+            $type = $this->fixtag(@$args['type']);
 
-
-            if (strlen($value['name']) <= 7 || strpos($value['name'], 'ArrayOf') === 0) {
-                $r .= "\npublic class " . $value['name'] . " {\n";
-                foreach ($value['elements'] as $key2 => $value2) {
-                    $r .= "\tprivate " . $type . ' _' . $value2['name'] . "; \n";
+            if (strlen($complexName) <= 7 || strpos($complexName, 'ArrayOf') === 0) {
+                $r .= "\npublic class " . $complexName . " {\n";
+                foreach ($args as $key2 => $value2) {
+                    $r .= "\tprivate " . $type . ' _' . $key2 . "; \n";
                 }
                 $r .= "\n";
-                foreach ($value['elements'] as $key2 => $value2) {
-                    $r .= "\tpublic " . $type . ' ' . $value2['name'] . "\n";
+                foreach ($args as $key2 => $value2) {
+                    $r .= "\tpublic {$type} {$key2}\n";
                     $r .= "\t{\n";
-                    $r .= "\t\tget { return _" . $value2['name'] . "; }\n";
-                    $r .= "\t\tset { _" . $value2['name'] . " = value; }\n";
+                    $r .= "\t\tget { return _{$key2}; }\n";
+                    $r .= "\t\tset { _{$key2} = value; }\n";
                     $r .= "\t}\n";
                 }
-
                 $r .= "}\n";
             }
         }
-
 
         return ($r);
     }
@@ -1656,9 +1925,13 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     protected function source() {
         $result = $this->html_header();
         $result .= '<br><h3>List of Operations</h3><ul>';
-        $result .= "<li><a href='" . $this->FILE . "?source=unity'>Unity (C#) Client Source</a></li>";
-        $result .= "<li><a href='" . $this->FILE . "?source=php'>PHP Server Source</a></li>";
-        $result .= "<li><a href='" . $this->FILE . "?source=phpclient'>PHP Source Client</a></li>";
+        $result .= "<li><a href='" . $this->portUrl . "?source=unity'>Unity (C#) Client Source</a></li>";
+        $result .= "<li><a href='" . $this->portUrl . "?source=php'>View PHP Server Source</a></li>";
+        if ($this->folderServer) {
+            $result .= "<li><a href='" . $this->portUrl
+                . "?source=php&save=true'>PHP Server Source (save in folder {$this->folderServer})</a></li>";
+        }
+        $result .= "<li><a href='" . $this->portUrl . "?source=phpclient'>PHP Source Client</a></li>";
         $result .= '</ul>';
         $result .= $this->html_footer();
 
@@ -1667,7 +1940,7 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
 
     protected function html_header() {
         $r = '<header>';
-        $r .= '<title>' . $this->NAME_WS . "</title>\n";
+        $r .= '<title>' . $this->nameWebService . "</title>\n";
 
         $r .= "<style type=\"text/css\">\n";
 
@@ -1704,7 +1977,7 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
 			</script>';
         $r .= '</header>';
         $r .= "<body>\n";
-        $r .= '<div id="content"><p class="heading1">' . $this->NAME_WS . '</p>';
+        $r .= '<div id="content"><p class="heading1">' . $this->nameWebService . '</p>';
         $r .= '<h2>' . $this->description . '</h2><br>';
         return $r;
     }
@@ -1712,12 +1985,11 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     protected function html_footer($timer_init = 0) {
         $r = '';
         $t2 = ceil((microtime(true) - $timer_init) * 1000) / 1000;
-        //echo base64_encode("<hr>Webserver powered by <a href='http://www.southprojects.com/cloudking/")."<br>";
+        //echo base64_encode("<hr>Webserver powered by <a href='http://www.southprojects.com/")."<br>";
         //echo base64_encode("'>CLOUDKING</a>")."<br>";
 
-
-        $b1 =
-            base64_decode('PGhyPldlYnNlcnZlciBwb3dlcmVkIGJ5IDxhIGhyZWY9J2h0dHA6Ly93d3cuc291dGhwcm9qZWN0cy5jb20vY2xvdWRraW5nLw==');
+        $b1
+            = base64_decode('PGhyPldlYnNlcnZlciBwb3dlcmVkIGJ5IDxhIGhyZWY9J2h0dHA6Ly93d3cuc291dGhwcm9qZWN0cy5jb20vY2xvdWRraW5nLw==');
         $b1 .= 'version.php?version=' . $this->version;
         $b1 .= base64_decode('Jz5DTE9VREtJTkc8L2E+');
         //echo $b1;
@@ -1740,70 +2012,74 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
         $result = $this->html_header();
 
         if ($this->verbose >= 2) {
-            $result .= 'Name Web Service :' . $this->NAME_WS . '<br>';
-            $result .= "Namespace :<a href='" . $this->NAMESPACE . "'>" . $this->NAMESPACE . '</a<br>';
-            $result .= "WSDL :<a href='" . $this->FILE . '?wsdl' . "'>WSDL description</a><br>";
-            $result .= 'Protocols Supported :' . (($this->soap11) ? 'SOAP 1.1, ' : '') .
-                (($this->soap12) ? 'SOAP 1.2 (2.0), ' : '') . (($this->get) ? 'HTTP GET, ' : '') .
-                (($this->post) ? 'HTTP POST, ' : '') . 'None <br>';
+            $result .= "Name Web Service :{$this->nameWebService}<br>";
+            $result .= "Namespace :<a href='{$this->nameSpace}'>{$this->nameSpace}</a><br>";
+            $result .= "WSDL :<a href='{$this->portUrl}?wsdl'>WSDL description</a><br>";
+            $result .= 'Protocols Supported :' . ($this->soap11 ? 'SOAP 1.1, ' : '') .
+                ($this->soap12 ? 'SOAP 1.2 (2.0), ' : '') . (($this->get) ? 'HTTP GET, ' : '') .
+
+                ($this->post ? 'HTTP POST, ' : '') . 'None <br>';
             if (method_exists($this, 'source')) {
-                $result .= "Source :<a href='" . $this->FILE . '?source' . "'>Source Generation</a><br>";
+                $result .= "Source :<a href='{$this->portUrl}?source'>Source Generation</a><br>";
             }
         }
         if ($this->verbose >= 1) {
-            $k='{';
+            $k = '{';
             $result .= "<br><h3 onclick='showAllDivOp();' style='cursor:pointer;'>List of Operations</h3><ul>";
-            $jsall = '<script>function showAllDivOp()'.$k;
-            foreach ($this->operation as $key => $value) {
-                $tmpname = $value['name'];
+            $jsall = "<script>function showAllDivOp(){$k}";
+
+            foreach ($this->operation as $complexName => $args) {
+                $tmpname = $complexName;
                 $js = "showDiv(\"$tmpname\");";
                 $jsall .= $js;
-                $result .= "<li><a onclick='showDiv(\"$tmpname\");' name='$tmpname'  style='cursor:pointer;'><strong>$tmpname</strong></a>(<ul id='" .
-                    $tmpname . "_ul' style='display:none;'>";
-                foreach ($value['in'] as $key2 => $value2) {
+                $result .= "<li><a onclick='showDiv(\"$tmpname\");' name='$tmpname'  style='cursor:pointer;'>" .
+                    "<strong>$tmpname</strong></a>(<ul id='{$tmpname}_ul' style='display:none;'>";
+                foreach ($args['in'] as $key2 => $value2) {
                     $tmp = $this->gen_description_util(@$value2['minOccurs'], @$value2['maxOccurs']);
                     $tmp .= (@$value2['byref']) ? ' ByRef ' : '';
                     if (@$value2['description']) {
                         $tmp .= '// ' . $value2['description'];
                     }
 
-                    $result .= '<li><strong>' . $value2['name'] . '</strong> as ' .
+                    $result .= '<li><strong>' . $key2 . '</strong> as ' .
                         $this->var_is_defined($value2['type']) . " $tmp </li>";
                 }
                 $result .= "</ul><span id='" . $tmpname .
                     "_hid' style='display:inline;'>parameters (click name to show)..</span><br>)";
-                foreach ($value['out'] as $key2 => $value2) {
+                if (isset($args['out']) && count($args['out']) > 1) {
+
+                    $value2 = $args['out'];
                     $tmp = $this->gen_description_util(@$value2['minOccurs'], @$value2['maxOccurs']);
                     if (@$value2['description']) {
-                        $tmp .= '// ' . $value2['description'];
+                        $tmp .= '// out: ' . $value2['description'];
                     }
                     $result .= ' as ' . $this->var_is_defined($value2['type']) . " $tmp ";
+
                 }
-                $result .= '&nbsp;&nbsp; //<i>' . $value['description'] . '</i><br>';
+                $result .= '&nbsp;&nbsp; //<i>' . $args['description'] . '</i><br>';
                 $result .= '</li>';
             }
             $result .= '</ul>';
             $jsall .= '}</script>';
             $result .= $jsall;
             $result .= "<br><h3 onclick='showAllDivComplex();' style='cursor:pointer;'>List of Complex Types</h3><ul>";
-            $k='{';
-            $jsall = '<script>function showAllDivComplex()'.$k;
-            foreach ($this->complextype as $key => $value) {
-                $tmpname = $value['name'];
+            $k = '{';
+            $jsall = '<script>function showAllDivComplex()' . $k;
+            foreach ($this->complextype as $complexName => $args) {
+                $tmpname = $complexName;
                 $js = "showDiv(\"$tmpname\");";
                 $jsall .= $js;
-                $result .= "<li ><a onclick='$js' name='$tmpname'  style='cursor:pointer;'><strong>tns::$tmpname</strong></a>{<ul id='" .
-                    $tmpname . "_ul' style='display:none;'>";
-                foreach ($value['elements'] as $key2 => $value2) {
+                $result .= "<li ><a onclick='$js' name='$tmpname'  style='cursor:pointer;'>" .
+                    "<strong>tns::$tmpname</strong></a>{<ul id='{$tmpname}_ul' style='display:none;'>";
+                foreach ($args as $key2 => $value2) {
                     $tmp = $this->gen_description_util(@$value2['minOccurs'], @$value2['maxOccurs']);
                     if (@$value2['description']) {
-                        $tmp .= ' // ' . $value2['description'];
+                        $tmp .= " // {$value2['description']}";
                     }
-                    $result .= '<li><strong>' . $value2['name'] . '</strong> as ' .
-                        $this->var_is_defined($value2['type']) . " $tmp </li>";
+                    $result .= "<li><strong>{$key2}</strong> as {$this->var_is_defined($value2['type'])} $tmp </li>";
                 }
-                $result .= "</ul><span id='" . $tmpname .
-                    "_hid' style='display:inline;'>parameters (click name to show)..</span>}";
+                $result .= "</ul><span id='{$tmpname}_hid' style='display:inline;'>" .
+                    'parameters (click name to show)..</span>}';
                 $result .= '</li>';
             }
             $result .= '</ul><br>';
@@ -1822,20 +2098,20 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
             $tmp1 = 'required';
         }
         if (@$max > 1) {
-            $tmp = 'Array(' . $min . ' to ' . $max . ')';
+            $tmp = "Array({$min} to {$max})";
         }
         if (@$max === 'unbounded') {
-            $tmp = 'Array(' . $min . ' to unlimited)';
+            $tmp = "Array({$min} to unlimited)";
         }
         return ($tmp . ' ' . $tmp1);
     }
 
     protected function var_is_defined($fullname) {
-        $x1 = explode(':', $fullname,2);
+        $x1 = explode(':', $fullname, 2);
         if (count($x1) != 2) {
             return "<span style='color:red'>$fullname</span>";
         }
-        list($space,$name)=$x1;
+        list($space, $name) = $x1;
         if ($space === 's') {
             if (!in_array($name, $this->predef_types)) {
                 return "<span style='color:red'>$fullname</span>";
@@ -1843,8 +2119,8 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
             return "<a href='http://www.w3.org/TR/xmlschema-2/#$name'>$fullname</a>";
         }
         if ($space === 'tns') {
-            foreach ($this->complextype as $key => $value) {
-                if ($name == $value['name']) {
+            foreach ($this->complextype as $complexName => $args) {
+                if ($name === $complexName) {
                     return "<a href='#$name'>$fullname</a>";
                 }
             }
@@ -1853,42 +2129,56 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
         return "<span style='color:red'>??$fullname</span>";
     }
 
-    public function addfunction($namefunction, $arr_in, $arr_out, $description = '') {
-        return $this->_addfunction($namefunction, $arr_in, $arr_out, $description);
-    }
+    /**
+     * @param string     $namefunction
+     * @param array      $arrIn  The input parameters
+     * @param array|null $arrOut The output parameter (if any)
+     * @param string     $description
+     *
+     * @return bool
+     */
+    public function addfunction($namefunction, $arrIn, $arrOut, $description = '') {
 
-    private function _addfunction($namefunction, $arr_in, $arr_out, $description = '') {
-        if (count($arr_out) > 1) {
-            trigger_error('output cannot exceed 1 value', E_USER_ERROR);
-        }
         $description = (!$description) ? "The function $namefunction" : $description;
-        foreach ($arr_in as $key => $value) {
-            if (!$arr_in[$key]['name']) {
-                trigger_error('name must be defined', E_USER_ERROR);
+        $resultIn = [];
+        foreach ($arrIn as $k => $value) {
+            if (!$arrIn[$k]['name']) {
+                throw new RuntimeException('name must be defined', E_USER_ERROR);
             }
-            $arr_in[$key]['name'] = (!@$arr_in[$key]['name']) ? 'undefined' : $arr_in[$key]['name'];
-            $arr_in[$key]['type'] = (!@$arr_in[$key]['type']) ? 's:string' : $arr_in[$key]['type'];
-            $arr_in[$key]['minOccurs'] = (@$arr_in[$key]['minOccurs'] == '') ? 0 : $arr_in[$key]['minOccurs'];
-            if (@$arr_in[$key]['maxOccurs'] > 1 || @$arr_in[$key]['maxOccurs'] === 'unbounded') {
+            $key = $arrIn[$k]['name'];
+
+            $resultIn[$key]['type'] = (!@$arrIn[$k]['type']) ? 's:string' : $arrIn[$k]['type'];
+            $resultIn[$key]['minOccurs'] = (@$arrIn[$k]['minOccurs'] == '') ? 0 : $arrIn[$k]['minOccurs'];
+            if (@$resultIn[$key]['maxOccurs'] > 1 || @$arrIn[$k]['maxOccurs'] === 'unbounded') {
                 trigger_error('maxOccurs cannot be >1', E_USER_ERROR);
             }
-            $arr_in[$key]['maxOccurs'] = (@$arr_in[$key]['maxOccurs'] == '') ? 1 : $arr_in[$key]['maxOccurs'];
-            $arr_in[$key]['extra'] = (@$arr_in[$key]['extra'] == '') ? '' : $arr_in[$key]['extra'];
-            $arr_in[$key]['byref'] = (@$arr_in[$key]['byref'] == '') ? false : $arr_in[$key]['byref'];
+            $resultIn[$key]['maxOccurs'] = (@$arrIn[$k]['maxOccurs'] == '') ? 1 : $arrIn[$k]['maxOccurs'];
+            $resultIn[$key]['extra'] = (@$arrIn[$k]['extra'] == '') ? '' : $arrIn[$k]['extra'];
+            $resultIn[$key]['byref'] = (@$arrIn[$k]['byref'] == '') ? false : $arrIn[$k]['byref'];
+            $resultIn[$key]['description'] = (@$arrIn[$k]['description'] == '') ? '' : $arrIn[$k]['description'];
         }
         // it must be only one value (or zero).
-        foreach ($arr_out as $key => $value) {
-            $arr_out[$key]['type'] = (!@$arr_out[$key]['type']) ? 's:string' : $arr_out[$key]['type'];
-            $arr_out[$key]['minOccurs'] = (!@$arr_out[$key]['minOccurs']) ? 0 : $arr_out[$key]['minOccurs'];
-            $arr_out[$key]['maxOccurs'] = (!@$arr_out[$key]['maxOccurs']) ? 1 : $arr_out[$key]['maxOccurs'];
-            $arr_out[$key]['extra'] = (!@$arr_out[$key]['extra']) ? '' : $arr_out[$key]['extra'];
-            $arr_out[$key]['byref'] = (!@$arr_out[$key]['byref']) ? false : $arr_out[$key]['byref'];
+
+        //$key=$arrIn[$k]['name'];
+        if (!isset($arrOut[0])) {
+            $resultOut = [];
+        } else {
+            if (count($arrOut) > 1) {
+                throw new RuntimeException('output cannot exceed 1 value', E_USER_ERROR);
+            }
+            $resultOut['name'] = $arrOut[0]['name'];
+            $resultOut['type'] = (!@$arrOut[0]['type']) ? 's:string' : $arrOut[0]['type'];
+            $resultOut['minOccurs'] = (!@$arrOut[0]['minOccurs']) ? 0 : $arrOut[0]['minOccurs'];
+            $resultOut['maxOccurs'] = (!@$arrOut[0]['maxOccurs']) ? 1 : $arrOut[0]['maxOccurs'];
+            $resultOut['extra'] = (!@$arrOut[0]['extra']) ? '' : $arrOut[0]['extra'];
+            $resultOut['byref'] = (!@$arrOut[0]['byref']) ? false : $arrOut[0]['byref'];
+            $resultOut['description'] = (!@$arrOut[0]['description']) ? '' : $arrOut[0]['description'];
+
         }
 
-        $this->operation[] = array(
-            'name' => $namefunction,
-            'in' => $arr_in,
-            'out' => $arr_out,
+        $this->operation[$namefunction] = array(
+            'in' => $resultIn,
+            'out' => $resultOut,
             'description' => $description
         );
 
@@ -1896,24 +2186,19 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     }
 
     public function addtype($nametype, $arr_param) {
-        $this->_addtype($nametype, $arr_param);
-    }
-
-    private function _addtype($nametype, $arr_param) {
-        foreach ($arr_param as $key => $value) {
-            $arr_param[$key]['name'] = (@$arr_param[$key]['name'] == '') ? 'undefined' : $arr_param[$key]['name'];
-            $arr_param[$key]['type'] = (@$arr_param[$key]['type'] == '') ? 's:string' : $arr_param[$key]['type'];
-            $arr_param[$key]['minOccurs'] = (@$arr_param[$key]['minOccurs'] == '') ? 0 : $arr_param[$key]['minOccurs'];
-            $arr_param[$key]['maxOccurs'] = (@$arr_param[$key]['maxOccurs'] == '') ? 1 : $arr_param[$key]['maxOccurs'];
-            $arr_param[$key]['extra'] = (@$arr_param[$key]['extra'] == '') ? '' : $arr_param[$key]['extra'];
-            $arr_param[$key]['byref'] = (@$arr_param[$key]['byref'] == '') ? false : $arr_param[$key]['byref'];
-            $arr_param[$key]['description'] =
-                (@$arr_param[$key]['description'] == '') ? 'a value' : $arr_param[$key]['description'];
+        $result = [];
+        foreach ($arr_param as $k => $value) {
+            $key = $arr_param[$k]['name'];
+            //$arr_param[$key]['name'] = (@$arr_param[$key]['name'] == '') ? 'undefined' : $arr_param[$key]['name'];
+            $result[$key]['type'] = (@$arr_param[$k]['type'] == '') ? 's:string' : $arr_param[$k]['type'];
+            $result[$key]['minOccurs'] = (@$arr_param[$k]['minOccurs'] == '') ? 0 : $arr_param[$k]['minOccurs'];
+            $result[$key]['maxOccurs'] = (@$arr_param[$k]['maxOccurs'] == '') ? 1 : $arr_param[$k]['maxOccurs'];
+            $result[$key]['extra'] = (@$arr_param[$k]['extra'] == '') ? '' : $arr_param[$k]['extra'];
+            $result[$key]['byref'] = (@$arr_param[$k]['byref'] == '') ? false : $arr_param[$k]['byref'];
+            $result[$key]['description'] = isset($arr_param) ? $arr_param[$k]['description'] : '';
         }
-        $this->complextype[] = array(
-            'name' => $nametype,
-            'elements' => $arr_param
-        );
+
+        $this->complextype[$nametype] = $result;
     }
 
     private function _save_wsdl($filename) {
@@ -1928,97 +2213,118 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
     }
 
     public function genwsdl() {
-        if ($this->custom_wsdl !== $this->FILE . '?wsdl') {
+        if ($this->custom_wsdl !== $this->portUrl . '?wsdl') {
             // se usa un archivo customizado.
             $handle = @fopen($this->custom_wsdl, 'rb');
             if ($handle) {
                 $contents = fread($handle, filesize($this->custom_wsdl));
             } else {
-                $contents = 'file or url :' . $this->custom_wsdl . " can't be open <br>\n";
+                $contents = "file or url :{$this->custom_wsdl} can't be open <br>\n";
             }
             fclose($handle);
             return $contents;
         }
         $cr = "\n";
         $tab1 = "\t";
-        $wsdl = '<?xml version="1.0" encoding="' . $this->encoding . '" ?>' . $cr;
-        $wsdl .= '<wsdl:definitions targetNamespace="' . $this->NAMESPACE .
-            '" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="' .
-            $this->NAMESPACE . '" ';
+        $wsdl = "<?xml version=\"1.0\" encoding=\"{$this->encoding}\" ?>{$cr}";
+        $wsdl .= "<wsdl:definitions targetNamespace=\"{$this->nameSpace}\" " .
+            'xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" ' .
+            'xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" ' .
+            "xmlns:mime=\"http://schemas.xmlsoap.org/wsdl/mime/\" xmlns:tns=\"{$this->nameSpace}\" ";
         $wsdl .= ' xmlns:s="http://www.w3.org/2001/XMLSchema" ';
         if ($this->soap12) {
             $wsdl .= ' xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" ';
         }
-        $wsdl .= ' xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">' .
-            $cr;
+        $wsdl .= ' xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" ' .
+            'xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">'
+            . $cr;
         if ($this->description) {
-            $wsdl .= '<wsdl:documentation >' . $this->description . '</wsdl:documentation>';
+            $wsdl .= "<wsdl:documentation >{$this->description}</wsdl:documentation>";
         }
         // types ***
-        $wsdl .= $tab1 . '<wsdl:types>' . $cr . '<s:schema elementFormDefault="qualified" targetNamespace="' .
-            $this->NAMESPACE . '">' . $cr;
+        $wsdl .= "{$tab1}<wsdl:types>{$cr}<s:schema elementFormDefault=\"qualified\" " .
+            "targetNamespace=\"{$this->nameSpace}\">{$cr}";
         // elementos in
-        foreach ($this->operation as $key => $value) {
-            $wsdl .= '<s:element name="' . $value['name'] . '">
+        foreach ($this->operation as $complexName => $args) {
+            $wsdl .= "<s:element name=\"{$complexName}\">
                     <s:complexType>
                        <s:sequence>
-                       ';
-            foreach ($value['in'] as $key2 => $value2) {
+                       ";
+            foreach ($args['in'] as $key2 => $value2) {
+                //var_dump($args['in']);
+                //die(1);
                 $minOccurs = $value2['minOccurs'];
                 $maxOccurs = $value2['maxOccurs'];
                 $wsdl .= '<s:element minOccurs="' . $minOccurs . '" maxOccurs="' . $maxOccurs . '" name="' .
-                    $value2['name'] . '" type="' . $value2['type'] . '" ' . @$value2['extra'] . '>';
-                //if (@$value2["description"]) {
-                //$wsdl.='<s:documentation >'.$value2["description"].'</s:documentation>';
-                //}
+                    $key2 . '" type="' . $value2['type'] . '" ' . @$value2['extra'] . '>';
+                if (@$value2['description']) {
+                    $wsdl .= "<s:annotation><s:documentation >{$value2['description']}</s:documentation></s:annotation>";
+                }
                 $wsdl .= '</s:element>';
             }
             $wsdl .= '</s:sequence>
                     </s:complexType>
                  </s:element>';
             // out
-            $wsdl .= '<s:element name="' . $value['name'] . 'Response">
-                    <s:complexType>
-                       <s:sequence>
-                       ';
-            foreach ($value['out'] as $key2 => $value2) {
-                $minOccurs = $value2['minOccurs'];
-                $maxOccurs = $value2['maxOccurs'];
-                $wsdl .= '<s:element minOccurs="' . $minOccurs . '" maxOccurs="' . $maxOccurs . '" name="' .
-                    $value['name'] . 'Result" type="' . $value2['type'] . '" ' . @$value2['extra'] . '>';
-                //if (@$value2["description"]) {
-                //$wsdl.='<s:documentation >'.$value2["description"].'</s:documentation>';
-                //}
-                $wsdl .= '</s:element>';
+            $out = false;
+            if (isset($args['out']) && count($args['out']) > 1) {
+                $out = true;
             }
-            foreach ($value['in'] as $key2 => $value2) {
+            foreach ($args['in'] as $key2 => $value2) {
                 if (@$value2['byref']) {
+                    $out = true;
+                    break;
+                }
+            }
+            $wsdl .= "<s:element name=\"{$complexName}Response\">";
+            if ($out) {
+                $wsdl .= '<s:complexType><s:sequence>';
+                if (isset($args['out']) && count($args['out']) > 1) {
+                    $value2 = $args['out'];
                     $minOccurs = $value2['minOccurs'];
                     $maxOccurs = $value2['maxOccurs'];
                     $wsdl .= '<s:element minOccurs="' . $minOccurs . '" maxOccurs="' . $maxOccurs . '" name="' .
-                        $value2['name'] . '" type="' . $value2['type'] . '" ' . @$value2['extra'] . '/>';
+                        $complexName . 'Result" type="' . $value2['type'] . '" ' . @$value2['extra'] . '>';
+                    if (@$value2['description']) {
+                        $wsdl .= '<s:annotation><s:documentation >' . $value2['description']
+                            . '</s:documentation></s:annotation>';
+                    }
+                    $wsdl .= '</s:element>';
                 }
-            }
+                foreach ($args['in'] as $key2 => $value2) {
+                    if (@$value2['byref']) {
+                        $minOccurs = $value2['minOccurs'];
+                        $maxOccurs = $value2['maxOccurs'];
+                        $wsdl .= '<s:element minOccurs="' . $minOccurs . '" maxOccurs="' . $maxOccurs . '" name="' .
+                            $key2 . '" type="' . $value2['type'] . '" ' . @$value2['extra'] . '>';
+                        if (@$value2['description']) {
+                            $wsdl .= "<s:annotation><s:documentation >{$value2['description']}</s:documentation></s:annotation>";
+                        }
+                        $wsdl .= '</s:element>';
+                    }
+                }
 
-            $wsdl .= '</s:sequence>
-                    </s:complexType>
-                 </s:element>
+                $wsdl .= '</s:sequence></s:complexType>';
+            } else {
+                $wsdl .= '<s:complexType/>';
+            }
+            $wsdl .= '</s:element>
                  ';
         }
         // complex types
-        foreach ($this->complextype as $key => $value) {
-            $wsdl .= '         <s:complexType name="' . $value['name'] . '">
+        foreach ($this->complextype as $complexName => $args) {
+            $wsdl .= '         <s:complexType name="' . $complexName . '">
                     <s:sequence>
                     ';
-            foreach ($value['elements'] as $key2 => $value2) {
+            foreach ($args as $key2 => $value2) {
                 $minOccurs = $value2['minOccurs'];
                 $maxOccurs = $value2['maxOccurs'];
-                $type = str_replace($this->NAMESPACE, 'tns', $value2['type']);
+                $type = str_replace($this->nameSpace, 'tns', $value2['type']);
                 $wsdl .= ' <s:element minOccurs="' . $minOccurs . '" maxOccurs="' . $maxOccurs . '" name="' .
-                    $value2['name'] . '" type="' . $type . '" ' . @$value2['extra'] . '>';
-                //if (@$value2["description"]) {
-                //$wsdl.='<s:documentation >'.$value2["description"].'</s:documentation>';
-                //}
+                    $key2 . '" type="' . $type . '" ' . @$value2['extra'] . '>';
+                if (@$value2['description']) {
+                    $wsdl .= "<s:annotation><s:documentation >{$value2['description']}</s:documentation></s:annotation>";
+                }
                 $wsdl .= '</s:element>';
             }
             $wsdl .= '            </s:sequence>
@@ -2030,8 +2336,8 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
              </wsdl:types>
            ';
         // messages
-        foreach ($this->operation as $key => $value) {
-            $name = $value['name'];
+        foreach ($this->operation as $complexName => $args) {
+            $name = $complexName;
             $wsdl .= '   <wsdl:message name="' . $name . 'SoapIn">
               <wsdl:part name="parameters" element="tns:' . $name . '"/>
            </wsdl:message>
@@ -2063,24 +2369,24 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
             }
         }
         // porttype
-        $wsdl .= '<wsdl:portType name="' . $this->NAME_WS . 'Soap">';
-        foreach ($this->operation as $key => $value) {
-            $name = $value['name'];
+        $wsdl .= '<wsdl:portType name="' . $this->nameWebService . 'Soap">';
+        foreach ($this->operation as $complexName => $args) {
+            $name = $complexName;
             $wsdl .= '<wsdl:operation name="' . $name . '">';
-            if (@$value['description']) {
-                $wsdl .= '<wsdl:documentation>' . @$value['description'] . '</wsdl:documentation>';
+            if (@$args['description']) {
+                $wsdl .= '<wsdl:documentation>' . @$args['description'] . '</wsdl:documentation>';
             }
             $wsdl .= '<wsdl:input message="tns:' . $name . 'SoapIn"/><wsdl:output message="tns:' . $name .
                 'SoapOut"/></wsdl:operation>';
         }
         $wsdl .= '</wsdl:portType>';
         if ($this->get) {
-            $wsdl .= '<wsdl:portType name="' . $this->NAME_WS . 'HttpGet">';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
+            $wsdl .= '<wsdl:portType name="' . $this->nameWebService . 'HttpGet">';
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
                 $wsdl .= '<wsdl:operation name="' . $name . '">';
-                if (@$value['description']) {
-                    $wsdl .= '<wsdl:documentation>' . @$value['description'] . '</wsdl:documentation>';
+                if (@$args['description']) {
+                    $wsdl .= '<wsdl:documentation>' . @$args['description'] . '</wsdl:documentation>';
                 }
                 $wsdl .= '<wsdl:input message="tns:' . $name . 'HttpGetIn"/><wsdl:output message="tns:' . $name .
                     'HttpGetOut"/></wsdl:operation>';
@@ -2088,12 +2394,12 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
             $wsdl .= '</wsdl:portType>';
         }
         if ($this->post) {
-            $wsdl .= '<wsdl:portType name="' . $this->NAME_WS . 'HttpPost">';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
+            $wsdl .= '<wsdl:portType name="' . $this->nameWebService . 'HttpPost">';
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
                 $wsdl .= '<wsdl:operation name="' . $name . '">';
-                if (@$value['description']) {
-                    $wsdl .= '<wsdl:documentation >' . @$value['description'] . '</wsdl:documentation>';
+                if (@$args['description']) {
+                    $wsdl .= '<wsdl:documentation >' . @$args['description'] . '</wsdl:documentation>';
                 }
                 $wsdl .= '<wsdl:input message="tns:' . $name . 'HttpPostIn"/><wsdl:output message="tns:' . $name .
                     'HttpPostOut"/></wsdl:operation>';
@@ -2103,13 +2409,13 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
 
         // binding
         if ($this->soap11) {
-            $wsdl .= '<wsdl:binding name="' . $this->NAME_WS . 'Soap" type="tns:' . $this->NAME_WS . 'Soap">
+            $wsdl .= '<wsdl:binding name="' . $this->nameWebService . 'Soap" type="tns:' . $this->nameWebService . 'Soap">
 			<soap:binding transport="http://schemas.xmlsoap.org/soap/http"/>     
 		   ';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
                 $wsdl .= '<wsdl:operation name="' . $name . '">
-				 <soap:operation soapAction="' . $this->NAMESPACE . $name . '" style="document"/>
+				 <soap:operation soapAction="' . $this->nameSpace . $name . '" style="document"/>
 				 <wsdl:input><soap:body use="literal"/></wsdl:input>
 				 <wsdl:output><soap:body use="literal"/></wsdl:output>
 			  </wsdl:operation>
@@ -2119,12 +2425,12 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
         }
         // binding12
         if ($this->soap12) {
-            $wsdl .= '<wsdl:binding name="' . $this->NAME_WS . 'Soap12" type="tns:' . $this->NAME_WS . 'Soap">
+            $wsdl .= '<wsdl:binding name="' . $this->nameWebService . 'Soap12" type="tns:' . $this->nameWebService . 'Soap">
 				<soap12:binding transport="http://schemas.xmlsoap.org/soap/http"/>';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
                 $wsdl .= '<wsdl:operation name="' . $name . '">
-				 <soap12:operation soapAction="' . $this->NAMESPACE . $name . '" style="document"/>
+				 <soap12:operation soapAction="' . $this->nameSpace . $name . '" style="document"/>
 				 <wsdl:input><soap12:body use="literal"/></wsdl:input>
 				 <wsdl:output><soap12:body use="literal"/></wsdl:output>
 			  </wsdl:operation>
@@ -2134,25 +2440,24 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
         }
         // binding12 (get)
         if ($this->soap12 && $this->get) {
-            $wsdl .= '<wsdl:binding name="' . $this->NAME_WS . 'HttpGet" type="tns:' . $this->NAME_WS . 'HttpGet">
+            $wsdl .= '<wsdl:binding name="' . $this->nameWebService . 'HttpGet" type="tns:' . $this->nameWebService . 'HttpGet">
 				<http:binding verb="GET" />';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
-                $wsdl .= '<wsdl:operation name="' . $name . '">';
-                $wsdl .= '<http:operation location="/' . $name . '" />';
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
+                $wsdl .= "<wsdl:operation name=\"{$name}\">";
+                $wsdl .= "<http:operation location=\"/{$name}\" />";
                 $wsdl .= '<wsdl:input><http:urlEncoded /></wsdl:input><wsdl:output>';
                 $wsdl .= '<mime:mimeXml part="HttpBody" /></wsdl:output></wsdl:operation>';
             }
             $wsdl .= '</wsdl:binding>';
         }
 
-
         // binding12 (post)
         if ($this->soap12 && $this->post) {
-            $wsdl .= '<wsdl:binding name="' . $this->NAME_WS . 'HttpPost" type="tns:' . $this->NAME_WS . 'HttpPost">
+            $wsdl .= '<wsdl:binding name="' . $this->nameWebService . 'HttpPost" type="tns:' . $this->nameWebService . 'HttpPost">
 				<http:binding verb="POST" />';
-            foreach ($this->operation as $key => $value) {
-                $name = $value['name'];
+            foreach ($this->operation as $complexName => $args) {
+                $name = $complexName;
                 $wsdl .= '<wsdl:operation name="' . $name . '">';
                 $wsdl .= '<http:operation location="/' . $name . '" />';
                 $wsdl .= '<wsdl:input><mime:content type="application/x-www-form-urlencoded" /></wsdl:input>';
@@ -2162,28 +2467,27 @@ public class ' . $this->NAME_WS . ' : MonoBehaviour
         }
         // service
 
-        $wsdl .= '<wsdl:service name="' . $this->NAME_WS . '">';
+        $wsdl .= '<wsdl:service name="' . $this->nameWebService . '">';
 
         if ($this->soap11) {
-            $wsdl .= '<wsdl:port name="' . $this->NAME_WS . 'Soap" binding="tns:' . $this->NAME_WS . 'Soap">
-             <soap:address location="' . $this->FILE . '"/></wsdl:port>';
+            $wsdl .= "<wsdl:port name=\"{$this->nameWebService}Soap\" binding=\"tns:{$this->nameWebService}Soap\">
+             <soap:address location=\"{$this->portUrl}\"/></wsdl:port>";
         }
         if ($this->soap12) {
-            $wsdl .= '<wsdl:port name="' . $this->NAME_WS . 'Soap12" binding="tns:' . $this->NAME_WS . 'Soap12">
-             <soap12:address location="' . $this->FILE . '"/></wsdl:port>';
+            $wsdl .= "<wsdl:port name=\"{$this->nameWebService}Soap12\" binding=\"tns:{$this->nameWebService}Soap12\">
+             <soap12:address location=\"{$this->portUrl}\"/></wsdl:port>";
             if ($this->get) {
-                $wsdl .= '<wsdl:port name="' . $this->NAME_WS . 'HttpGet" binding="tns:' . $this->NAME_WS . 'HttpGet">
-				 <http:address location="' . $this->FILE . '"/></wsdl:port>';
+                $wsdl .= "<wsdl:port name=\"{$this->nameWebService}HttpGet\" binding=\"tns:{$this->nameWebService}HttpGet\">
+				 <http:address location=\"{$this->portUrl}\"/></wsdl:port>";
             }
             if ($this->post) {
-                $wsdl .= '<wsdl:port name="' . $this->NAME_WS . 'HttpPost" binding="tns:' . $this->NAME_WS . 'HttpPost">
-				 <http:address location="' . $this->FILE . '"/></wsdl:port>';
+                $wsdl .= "<wsdl:port name=\"{$this->nameWebService}HttpPost\" binding=\"tns:{$this->nameWebService}HttpPost\">
+				 <http:address location=\"{$this->portUrl}\"/></wsdl:port>";
             }
 
         }
         $wsdl .= '</wsdl:service></wsdl:definitions>';
         return $wsdl;
     }
-
 
 }

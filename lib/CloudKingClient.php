@@ -13,9 +13,9 @@ License http://www.southprojects.com/product/cloudking/license1-1/
 namespace eftec\cloudking;
 
 class CloudKingClient {
-    public $user_agent = 'CloudKing Client (2.6)';
+    public $user_agent = 'CloudKing Client (3.0)';
     public $charset = 'UTF-8';
-    /** @var float=[1.1,1.2][$i]  */
+    /** @var float=[1.1,1.2][$i] */
     public $soap = 1.2; // or 1.1
     public $tempuri = 'http://tempuri.org';
     public $prefixns = 'ts';
@@ -25,7 +25,7 @@ class CloudKingClient {
     // var $proxyhost = "";
     public $proxyport = '';
     public $lastError = '';
-    public $lastResponse='';
+    public $lastResponse = '';
 
     /**
      * CloudKingClient constructor.
@@ -33,7 +33,7 @@ class CloudKingClient {
      * @param float  $soap
      * @param string $tempuri
      */
-    public function __construct($soap=1.2, $tempuri='http://tempuri.org') {
+    public function __construct($soap = 1.2, $tempuri = 'http://tempuri.org') {
         $this->soap = $soap;
         $this->tempuri = $tempuri;
     }
@@ -48,8 +48,8 @@ class CloudKingClient {
      */
     public function loadurl($url, $xmlparam, $nameFunction, $timeout = 30) {
         $header = [];
-        $this->lastError='';
-        $this->lastResponse='';
+        $this->lastError = '';
+        $this->lastResponse = '';
 
         $header[] = 'User-Agent: ' . $this->user_agent;
         if ($this->cookie) {
@@ -66,11 +66,11 @@ class CloudKingClient {
             $content3 .= '</soap:Body></soap:Envelope>';
         } else {
             $header[] = 'Content-Type: text/xml;charset' . $this->charset . '';
-            $header[] = 'SOAPAction: "' . $this->tempuri . '/' . $nameFunction . '"';
-            $content = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:' .
-                $this->prefixns . '="' . $this->tempuri . '/">';
+            $header[] = "SOAPAction: \"{$this->tempuri}/{$nameFunction}\"";
+            $content = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" ' .
+                "xmlns:{$this->prefixns}=\"{$this->tempuri}/\">";
             $content .= '<soapenv:Header/><soapenv:Body>';
-            $content3 = '</' . $this->prefixns . ':' . $nameFunction . '>';
+            $content3 = "</{$this->prefixns}:{$nameFunction}>";
             $content3 .= '</soapenv:Body></soapenv:Envelope>';
         }
         $content .= '<' . $this->prefixns . ':' . $nameFunction . '>';
@@ -79,7 +79,7 @@ class CloudKingClient {
             base64_encode($this->proxyusername . ':' . $this->proxypassword) . '' : '';
 
         $rawresponse = $this->httpPost($url, $content, $header, $timeout);
-        $this->lastResponse=$rawresponse;
+        $this->lastResponse = $rawresponse;
 
         if ($rawresponse === false) {
             return false;
@@ -87,18 +87,17 @@ class CloudKingClient {
 
         $p0 = strpos($rawresponse, '<?xml');
         $p1 = strpos($rawresponse, '?>', $p0);
-        if($p0===false || $p1===false) {
-            $this->lastError=$this->lastError===''?'Error not xml tag' : $this->lastError;
+        if ($p0 === false || $p1 === false) {
+            $this->lastError = $this->lastError === '' ? 'Error not xml tag' : $this->lastError;
             return false;
         }
         $resultadoxml = substr($rawresponse, $p1 + 2);
 
-        
         $g = $this->xml2array($resultadoxml);
-        $nfR=$nameFunction . 'Response';
+        $nfR = $nameFunction . 'Response';
         // ["Envelope"]["Body"]
-        if(!isset($g['Envelope']['Body'][$nfR])) {
-            $this->lastError=$this->lastError===''?'Error no Envelope and Body tag' : $this->lastError;
+        if (!isset($g['Envelope']['Body'][$nfR])) {
+            $this->lastError = $this->lastError === '' ? 'Error no Envelope and Body tag' : $this->lastError;
             return false;
         }
         return $g['Envelope']['Body'][$nfR];
@@ -127,16 +126,16 @@ class CloudKingClient {
         curl_setopt($curl, CURLOPT_TIMEOUT, $timeout); //timeout in seconds
         $response = curl_exec($curl);
 
-        $this->lastError=curl_error($curl);
-        if($this->lastError==='') {
+        $this->lastError = curl_error($curl);
+        if ($this->lastError === '') {
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            if($httpcode>400) {
-                $this->lastError='Error Code '.$httpcode;
+            if ($httpcode > 400) {
+                $this->lastError = 'Error Code ' . $httpcode;
             }
         }
-        
+
         curl_close($curl);
-        return ($this->lastError!=='') ? false : $response;
+        return ($this->lastError !== '') ? false : $response;
     }
 
     /**
@@ -184,7 +183,7 @@ class CloudKingClient {
             }
         }
         if ($start) {
-            $xmlstr .= '</' . $name . '>';
+            $xmlstr .= "</{$name}>";
         }
         return $xmlstr;
     }
@@ -209,12 +208,12 @@ class CloudKingClient {
         xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, 'utf-8');
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 1);
-        $f=@xml_parse_into_struct($parser, trim($xml), $xmls);
+        $f = @xml_parse_into_struct($parser, trim($xml), $xmls);
         @xml_parser_free($parser);
-        if($f===0) {
+        if ($f === 0) {
             return null;
         }
-        
+
         /*
          We convert siblings in numeric indexes.
          <parent>
@@ -227,9 +226,9 @@ class CloudKingClient {
             <node>
                 <child>
             </node>
-        </parent>
+         </parent>
             ['node'=>'child']
-        <parent>
+         <parent>
             <0> <-- open 
                 <child>
             </node>
@@ -239,45 +238,46 @@ class CloudKingClient {
             <2>
                 <child>
             </node>
-        </parent> <-- change of level.
-        [0=>'child',1=>'child','2'=>'child']        
+         </parent> <-- change of level.
+         [0=>'child',1=>'child','2'=>'child']        
         */
-        $c=count($xmls);
+        $c = count($xmls);
         /** @noinspection ForeachInvariantsInspection */
-        for($i0=0;$i0<$c;$i0++) {
-            $xitem=&$xmls[$i0];
-            if(isset($xitem['type']) && $xitem['type']==='open') {
-                $findme=$xitem['tag'];
-                $findmelevel=$xitem['level'];
-                $found=0;
-                for($i1=$i0+1;$i1<$c;$i1++) {
-                    $xitem1=&$xmls[$i1];
-                    $level=$xitem1['level'];
-                    if($level<$findmelevel) {
+        for ($i0 = 0; $i0 < $c; $i0++) {
+            $xitem =& $xmls[$i0];
+            if (isset($xitem['type']) && $xitem['type'] === 'open') {
+                $findme = $xitem['tag'];
+                $findmelevel = $xitem['level'];
+                $found = 0;
+                for ($i1 = $i0 + 1; $i1 < $c; $i1++) {
+                    $xitem1 =& $xmls[$i1];
+                    $level = $xitem1['level'];
+                    if ($level < $findmelevel) {
                         // end of the siblings 
                         break;
                     }
-                    if($level===$findmelevel && isset($xitem1['type']) && $xitem1['type']==='open' 
-                        && $xitem1['tag']===$findme) {
+                    if ($level === $findmelevel && isset($xitem1['type']) && $xitem1['type'] === 'open'
+                        && $xitem1['tag'] === $findme
+                    ) {
                         // found a sibling
-                        if($found===0) {
+                        if ($found === 0) {
                             // we replace the first sibling.
-                            $xitem['tag']=0;
+                            $xitem['tag'] = 0;
                         }
                         // and we replace the current sibling
                         $found++;
-                        $xitem1['tag']=$found;
+                        $xitem1['tag'] = $found;
                     }
                 }
             }
         }
-        
+
         foreach ($xmls as $x) {
             //var_dump($x);
             //echo "<br>";
             $type = $x['type'];
             $level = $x['level'];
-            $value =isset($x['value']) ? $x['value'] : null;
+            $value = isset($x['value']) ? $x['value'] : null;
             $tag = $x['tag'];
             switch ($type) {
                 case 'open':
@@ -289,7 +289,7 @@ class CloudKingClient {
                     }
                     */
                     $parentKey[$level] = $ns;
-               
+
                     $this->addElementArray($result, $parentKey, $level, $ns, []);
                     break;
                 case 'close':
@@ -302,7 +302,8 @@ class CloudKingClient {
         }
         return $result;
     }
-    private $level=[[],[],[],[],[],[]];
+
+
 
     private function addElementArray(&$array, $keys, $level, $tag, $value) {
         switch ($level) {
@@ -347,6 +348,11 @@ class CloudKingClient {
             case 11:
                 $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
                 [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$tag]
+                    = $value;
+                break;
+            case 12:
+                $array[$keys[1]][$keys[2]][$keys[3]][$keys[4]][$keys[5]][$keys[6]]
+                [$keys[7]][$keys[8]][$keys[9]][$keys[10]][$keys[11]][$tag]
                     = $value;
                 break;
         }
